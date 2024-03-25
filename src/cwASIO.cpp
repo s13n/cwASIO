@@ -1,11 +1,10 @@
 /** @file       cwASIO.cpp
  *  @brief      cwASIO API (Windows implementation)
- *  @author     Axel Holzinger
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2014-2024
- *  @copyright  Usage and copying requires a license granted by the authors
- * @addtogroup AsioDevice
+ *  @date       2023-2024
+ *  @copyright  See file LICENSE in toplevel directory
+ * @addtogroup cwASIO
  *  @{
  */
 
@@ -27,13 +26,13 @@ ASIOError ASIOInit(ASIODriverInfo *info) {
     CComPtr<IClassFactory> factory;
     HRESULT hr = ::CoGetClassObject(clsid, CLSCTX_INPROC_SERVER, NULL, IID_IClassFactory, (void**)&factory);
     if(FAILED(hr)) {
-        strcpy(info->errorMessage, "getting class factory");
+        strcpy_s(info->errorMessage, sizeof(info->errorMessage), "getting class factory");
         return ASE_NotPresent;
     }
     void *instance;
     hr = factory->CreateInstance(NULL, clsid, &instance);
     if(FAILED(hr) || !instance) {
-        strcpy(info->errorMessage, "creating instance");
+        strcpy_s(info->errorMessage, sizeof(info->errorMessage), "creating instance");
         return ASE_NotPresent;
     }
     theAsioDriver = static_cast<IASIO*>(instance);
@@ -179,14 +178,14 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
         if (!wstr.empty()) {
             res.resize(::WideCharToMultiByte(CP_UTF8, 0, wstr.data(), -1, nullptr, 0, nullptr, nullptr));
             if (!res.empty()) {
-                if (int len = ::WideCharToMultiByte(CP_UTF8, 0, wstr.data(), -1, res.data(), res.size(), nullptr, nullptr))
+                if (int len = ::WideCharToMultiByte(CP_UTF8, 0, wstr.data(), -1, res.data(), int(res.size()), nullptr, nullptr))
                     res.resize(len - 1);
                 else
                     res.clear();
             }
         }
         return res;
-        };
+    };
 
     for (DWORD index = 0; err != ERROR_NO_MORE_ITEMS; ++index) {
         std::wstring name;
@@ -223,7 +222,7 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
     return ERROR_SUCCESS;
 }
 
-IASIO* cwASIOload(char const *key, HRESULT &res) {
+IASIO *cwASIOload(char const *key, HRESULT &res) {
     CLSID id;
     USES_CONVERSION;
     if (auto clsid = A2COLE(key))

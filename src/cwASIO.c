@@ -1,11 +1,10 @@
 /** @file       cwASIO.c
  *  @brief      cwASIO API (Unix implementation)
- *  @author     Axel Holzinger
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2014-2024
- *  @copyright  Usage and copying requires a license granted by the authors
- * @addtogroup AsioDevice
+ *  @date       2023-2024
+ *  @copyright  See file LICENSE in toplevel directory
+ * @addtogroup cwASIO
  *  @{
  */
 
@@ -281,7 +280,7 @@ static char *cwASIOreadConfig(char const *base, char const *name, char const *fi
     }
 }
 
-int cwASIOenumerate(EnumerateCallback *cb, void *context) {
+int cwASIOenumerate(cwASIOcallback *cb, void *context) {
     static char const *path = "/etc/cwASIO";
     int res = 0;
     struct dirent *rent;

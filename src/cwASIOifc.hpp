@@ -1,11 +1,10 @@
 /** @file       cwASIOifc.hpp
  *  @brief      cwASIO driver API (Windows)
- *  @author     Axel Holzinger
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2014-2024
- *  @copyright  Usage and copying requires a license granted by the authors
- * @addtogroup AsioDevice
+ *  @date       2023-2024
+ *  @copyright  See file LICENSE in toplevel directory
+ * @addtogroup cwASIO
  *  @{
  */
 #pragma once

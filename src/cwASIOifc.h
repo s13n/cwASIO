@@ -1,11 +1,10 @@
 /** @file       cwASIOifc.h
  *  @brief      cwASIO driver API (Unix)
- *  @author     Axel Holzinger
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2014-2024
- *  @copyright  Usage and copying requires a license granted by the authors
- * @addtogroup AsioDevice
+ *  @date       2023-2024
+ *  @copyright  See file LICENSE in toplevel directory
+ * @addtogroup cwASIO
  *  @{
  */
 #pragma once
@@ -42,9 +41,9 @@ struct cwASIO_DriverInterface {
     long (*outputReady)(struct AsioDriver *);
 };
 
-typedef bool (EnumerateCallback)(void *, char const *, char const *, char const *);
+typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
 
-int cwASIOenumerate(EnumerateCallback *cb, void *context);
+int cwASIOenumerate(cwASIOcallback *cb, void *context);
 
 long cwASIOload(char const *path, struct cwASIO_DriverInterface *ifc);
 
