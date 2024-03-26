@@ -1,13 +1,23 @@
 
 add_library(cwASIO_lib)
 
-target_sources(cwASIO_lib
-PUBLIC
-    cwASIO.h
-    $<IF:$<BOOL:${WIN32}>,cwASIOifc.hpp,cwASIOifc.h>
-PRIVATE
-    $<IF:$<BOOL:${WIN32}>,cwASIO.cpp,cwASIO.c>
-)
+if(WIN32)
+    target_sources(cwASIO_lib
+    PUBLIC
+        cwASIO.h
+        cwASIOifc.hpp
+    PRIVATE
+        cwASIO.cpp
+    )
+else()
+    target_sources(cwASIO_lib
+    PUBLIC
+        cwASIO.h
+        cwASIOifc.h
+    PRIVATE
+        cwASIO.c
+    )
+endif()
 
 target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
