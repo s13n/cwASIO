@@ -3,7 +3,7 @@ add_library(cwASIO_lib)
 
 if(WIN32)
     target_sources(cwASIO_lib
-    PUBLIC
+    PUBLIC FILE_SET HEADERS FILES
         cwASIO.h
         cwASIOifc.hpp
     PRIVATE
@@ -11,7 +11,7 @@ if(WIN32)
     )
 else()
     target_sources(cwASIO_lib
-    PUBLIC
+    PUBLIC FILE_SET HEADERS FILES
         cwASIO.h
         cwASIOifc.h
     PRIVATE
@@ -19,12 +19,11 @@ else()
     )
 endif()
 
-target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(cwASIO_lib PUBLIC .)
 
 set_target_properties(cwASIO_lib PROPERTIES
-    WINDOWS_EXPORT_ALL_SYMBOLS ON           # Needed when building ptp++client as a DLL
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>$<$<BOOL:${PTP_RUNTIME_SHARED}>:DLL>"
-    PUBLIC_HEADER "${PROJECT_SOURCE_DIR}/src/cwASIO.h;${PROJECT_SOURCE_DIR}/src/cwASIOifc.h;${PROJECT_SOURCE_DIR}/src/cwASIO.hpp"
 )
 
 add_library(cwASIO::lib ALIAS cwASIO_lib)
