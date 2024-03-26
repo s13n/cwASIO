@@ -4,9 +4,9 @@ add_library(cwASIO_lib)
 target_sources(cwASIO_lib
 PUBLIC
     cwASIO.h
-    $<IF:${WIN32},cwASIOifc.hpp,cwASIOifc.h>
+    $<IF:$<BOOL:${WIN32}>,cwASIOifc.hpp,cwASIOifc.h>
 PRIVATE
-    $<IF:${WIN32},cwASIO.cpp,cwASIO.c>
+    $<IF:$<BOOL:${WIN32}>,cwASIO.cpp,cwASIO.c>
 )
 
 target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
