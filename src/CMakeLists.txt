@@ -9,6 +9,10 @@ if(WIN32)
     PRIVATE
         cwASIO.cpp
     )
+    find_path(ATL_HEADER atlbase.h DOC "ATL atlbase.h header file")
+    message(VERBOSE "Using atlbase.h in folder ${ATL_HEADER}")
+    find_path(UNK_HEADER unknwn.h DOC "COM unknwn.h header file")
+    message(VERBOSE "Using unknwn.h in folder ${UNK_HEADER}")
 else()
     target_sources(cwASIO_lib
     PUBLIC FILE_SET HEADERS FILES
