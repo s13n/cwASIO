@@ -3,7 +3,7 @@ add_library(cwASIO_lib)
 
 if(WIN32)
     target_sources(cwASIO_lib
-    PUBLIC FILE_SET HEADERS FILES
+    PUBLIC
         cwASIO.h
         cwASIOifc.hpp
     PRIVATE
@@ -15,7 +15,7 @@ if(WIN32)
     message(VERBOSE "Using unknwn.h in folder ${UNK_HEADER}")
 else()
     target_sources(cwASIO_lib
-    PUBLIC FILE_SET HEADERS FILES
+    PUBLIC
         cwASIO.h
         cwASIOifc.h
     PRIVATE
@@ -23,7 +23,7 @@ else()
     )
 endif()
 
-target_include_directories(cwASIO_lib PUBLIC .)
+target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 set_target_properties(cwASIO_lib PROPERTIES
     WINDOWS_EXPORT_ALL_SYMBOLS ON
