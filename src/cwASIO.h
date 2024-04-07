@@ -183,7 +183,16 @@ typedef struct cwASIOCallbacks {
         // the driver calls asioMessage with selector kAsioSupportsTimeInfo.
 } ASIOCallbacks;
 
-ASIOError ASIOLoad(char const *path);
+/** Load the driver and enable the below functions.
+* If you want to use the C functions below, which are ASIO SDK compatible, then
+* you need to use ASIOLoad() to load the driver, instead of using cwASIOload().
+* This causes a reference to the driver being remembered in a global variable
+* behind the scenes.
+* @param key A system-specific textual key that identifies the driver to load.
+* @return an error code, which is zero on success.
+*/
+ASIOError ASIOLoad(char const *key);
+
 ASIOError ASIOInit(ASIODriverInfo *info);
 ASIOError ASIOExit(void);
 ASIOError ASIOStart(void);

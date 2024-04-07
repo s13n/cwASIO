@@ -19,6 +19,15 @@
 static IASIO *theAsioDriver = nullptr;
 static CLSID clsid{};
 
+
+ASIOError ASIOLoad(char const* path) {
+    if (theAsioDriver)
+        return ASE_NoMemory;
+    HRESULT hres;
+    theAsioDriver = cwASIOload(path, hres);
+    return theAsioDriver ? ASE_OK : ASE_NotPresent;
+}
+
 ASIOError ASIOInit(ASIODriverInfo *info) {
     if(theAsioDriver || !info)
         return ASE_InvalidParameter;

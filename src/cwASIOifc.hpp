@@ -42,14 +42,25 @@ __interface IASIO : public IUnknown {
 
 typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
 
-// enumerate devices from Windows registry
-/* An enumeration function is passed to cwASIOenumerate(), which will get called once for every entry found in the ASIO device list.
+/** Enumerate devices from Windows registry.
+* An enumeration function is passed to cwASIOenumerate(), which will get called once for every entry found in the ASIO driver list.
 * If the enumeration function returns with a true result, enumeration continues with the next entry, otherwise enumeration terminates.
-* Three wide strings are passed to the enumeration function: Name, CLSID and Description. The latter two might be empty, if the
+* Three strings are passed to the enumeration function: Name, CLSID and Description. The latter two might be empty, if the
 * corresponding registry entry is empty or absent. You might want to ignore such entries.
+* @param cb Pointer to callback function
+* @param context Pointer to be forwarded to callback function as its first parameter.
+* @return error code, which is zero on success.
 */
 int cwASIOenumerate(cwASIOcallback *cb, void *context);
 
+/** Load the ASIO driver.
+* @param key On Windows, the CLSID of the driver to load.
+* @param res A variable to receive an error code when unsuccessful.
+* @return Pointer to the driver interface, or nullptr when unsuccessful.
+*/
 IASIO* cwASIOload(char const *key, HRESULT &res);
 
+/** Unload the ASIO driver.
+* @param ifc Pointer to the driver interface that was returned by cwASIOload()
+*/
 void cwASIOunload(IASIO *ifc);
