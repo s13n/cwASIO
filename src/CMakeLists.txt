@@ -19,7 +19,13 @@ if(WIN32)
         cwASIO.cpp
     )
 
-#    set_target_properties(cwASIO_lib PROPERTIES PUBLIC_HEADER "cwASIO.h;cwASIOifc.hpp")
+    option(CWASIO_SHARED_RUNTIME "Build cwASIO using the shared runtime library" ${CWASIO_SHARED})
+    
+    set_target_properties(cwASIO_lib PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>$<$<BOOL:${CWASIO_SHARED_RUNTIME}>:DLL>"
+        PUBLIC_HEADER "cwASIO.h;cwASIOifc.hpp"
+    )
 
     find_path(ATL_HEADER atlbase.h DOC "ATL atlbase.h header file")
     message(VERBOSE "Using atlbase.h in folder ${ATL_HEADER}")
