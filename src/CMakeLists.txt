@@ -2,12 +2,13 @@ cmake_minimum_required(VERSION 3.20)
 
 option(CWASIO_SHARED "Build cwASIO as a shared library" ${BUILD_SHARED_LIBS})
 if(CWASIO_SHARED)
-    add_library(cwASIO_lib SHARED)
-    message(VERBOSE "Building cwASIO as a shared library")
+    set(CWASIO_LIBTYPE SHARED)
 else()
-    add_library(cwASIO_lib STATIC)
-    message(VERBOSE "Building cwASIO as a static library")
+    set(CWASIO_LIBTYPE STATIC)
 endif()
+
+add_library(cwASIO_lib ${CWASIO_LIBTYPE})
+message(VERBOSE "Building cwASIO as a ${CWASIO_LIBTYPE} library")
 add_library(cwASIO::lib ALIAS cwASIO_lib)
 
 if(WIN32)
@@ -18,12 +19,10 @@ if(WIN32)
     PRIVATE
         cwASIO.cpp
     )
-
-    option(CWASIO_SHARED_RUNTIME "Build cwASIO using the shared runtime library" ${CWASIO_SHARED})
     
     set_target_properties(cwASIO_lib PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
         POSITION_INDEPENDENT_CODE ON
-        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>$<$<BOOL:${CWASIO_SHARED_RUNTIME}>:DLL>"
         PUBLIC_HEADER "cwASIO.h;cwASIOifc.hpp"
     )
 
@@ -44,11 +43,6 @@ else()
 endif()
 
 target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
-set_target_properties(cwASIO_lib PROPERTIES
-    WINDOWS_EXPORT_ALL_SYMBOLS ON
-    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>$<$<BOOL:${PTP_RUNTIME_SHARED}>:DLL>"
-)
 
 include(GNUInstallDirs)
 
