@@ -36,22 +36,22 @@ enum cwASIOBool {
 
 typedef long ASIOError;
 enum cwASIOerror {
-    ASE_OK = 0,             // This value will be returned whenever the call succeeded
-    ASE_SUCCESS = 0x3f4847a0, // unique success return value for ASIOFuture calls
-    ASE_NotPresent = -1000, // hardware input or output is not present or available
-    ASE_HWMalfunction,      // hardware is malfunctioning (can be returned by any ASIO function)
-    ASE_InvalidParameter,   // input parameter invalid
-    ASE_InvalidMode,        // hardware is in a bad mode or used in a bad mode
-    ASE_SPNotAdvancing,     // hardware is not running when sample position is inquired
-    ASE_NoClock,            // sample clock or rate cannot be determined or is not present
-    ASE_NoMemory            // not enough memory for completing the request
+    ASE_OK = 0,                 // This value will be returned whenever the call succeeded
+    ASE_SUCCESS = 0x3f4847a0,   // unique success return value for ASIOFuture calls
+    ASE_NotPresent = -1000,     // hardware input or output is not present or available
+    ASE_HWMalfunction,          // hardware is malfunctioning (can be returned by any ASIO function)
+    ASE_InvalidParameter,       // input parameter invalid
+    ASE_InvalidMode,            // hardware is in a bad mode or used in a bad mode
+    ASE_SPNotAdvancing,         // hardware is not running when sample position is inquired
+    ASE_NoClock,                // sample clock or rate cannot be determined or is not present
+    ASE_NoMemory                // not enough memory for completing the request
 };
 
 typedef long ASIOSampleType;
 enum cwASIOSampleType {
-    ASIOSTInt16MSB   = 0,
-    ASIOSTInt24MSB   = 1,       // used for 20 bits as well
-    ASIOSTInt32MSB   = 2,
+    ASIOSTInt16MSB = 0,
+    ASIOSTInt24MSB = 1,         // used for 20 bits as well
+    ASIOSTInt32MSB = 2,
     ASIOSTFloat32MSB = 3,       // IEEE 754 32 bit float
     ASIOSTFloat64MSB = 4,       // IEEE 754 64 bit double float
 
@@ -62,9 +62,9 @@ enum cwASIOSampleType {
     ASIOSTInt32MSB20 = 10,      // 32 bit data with 20 bit alignment
     ASIOSTInt32MSB24 = 11,      // 32 bit data with 24 bit alignment
 
-    ASIOSTInt16LSB   = 16,
-    ASIOSTInt24LSB   = 17,      // used for 20 bits as well
-    ASIOSTInt32LSB   = 18,
+    ASIOSTInt16LSB = 16,
+    ASIOSTInt24LSB = 17,        // used for 20 bits as well
+    ASIOSTInt32LSB = 18,
     ASIOSTFloat32LSB = 19,      // IEEE 754 32 bit float, as found on Intel x86 architecture
     ASIOSTFloat64LSB = 20,      // IEEE 754 64 bit double float, as found on Intel x86 architecture
 
@@ -82,16 +82,6 @@ enum cwASIOSampleType {
 
     ASIOSTLastEntry
 };
-
-typedef enum cwAsioTimeInfoFlags {
-    kSystemTimeValid        = 1,            // must always be valid
-    kSamplePositionValid    = 1 << 1,       // must always be valid
-    kSampleRateValid        = 1 << 2,
-    kSpeedValid             = 1 << 3,
-
-    kSampleRateChanged      = 1 << 4,
-    kClockSourceChanged     = 1 << 5
-} AsioTimeInfoFlags;
 
 typedef struct cwASIODriverInfo {
     long asioVersion;       // currently, 2
@@ -135,13 +125,32 @@ typedef struct cwAsioTimeInfo {
     char reserved[12];
 } AsioTimeInfo;
 
+typedef enum cwAsioTimeInfoFlags {
+    kSystemTimeValid = 1,           // must always be valid
+    kSamplePositionValid = 1 << 1,  // must always be valid
+    kSampleRateValid = 1 << 2,
+    kSpeedValid = 1 << 3,
+
+    kSampleRateChanged = 1 << 4,
+    kClockSourceChanged = 1 << 5
+} AsioTimeInfoFlags;
+
 typedef struct cwASIOTimeCode {
-    double speed;               // speed relation (fraction of nominal speed)
-                                // optional; set to 0. or 1. if not supported
+    double speed;               // speed relation (fraction of nominal speed) optional; set to 0. or 1. if not supported
     ASIOSamples timeCodeSamples;// time in samples
     unsigned long flags;        // some information flags (see below)
     char future[64];
 } ASIOTimeCode;
+
+typedef enum cwASIOTimeCodeFlags {
+    kTcValid = 1,
+    kTcRunning = 1 << 1,
+    kTcReverse = 1 << 2,
+    kTcOnspeed = 1 << 3,
+    kTcStill = 1 << 4,
+
+    kTcSpeedValid = 1 << 8
+} ASIOTimeCodeFlags;
 
 typedef struct cwASIOTime {     // both input/output
     long reserved[4];           // must be 0
@@ -184,7 +193,7 @@ typedef struct cwASIOCallbacks {
 } ASIOCallbacks;
 
 // asioMessage selectors
-enum cwASIOselector {
+enum cwASIOmessageSel {
     kAsioSelectorSupported = 1, // selector in <value>, returns 1L if supported, 0 otherwise
     kAsioEngineVersion,         // returns engine (host) asio implementation version, 2 or higher
     kAsioResetRequest,          // request driver reset. if accepted, this
@@ -223,6 +232,95 @@ enum cwASIOselector {
     kAsioNumMessageSelectors
 };
 
+enum cwASIOfutureSel {
+    kAsioEnableTimeCodeRead = 1,    // no arguments
+    kAsioDisableTimeCodeRead,       // no arguments
+    kAsioSetInputMonitor,           // ASIOInputMonitor* in params
+    kAsioTransport,                 // ASIOTransportParameters* in params
+    kAsioSetInputGain,              // ASIOChannelControls* in params, apply gain
+    kAsioGetInputMeter,             // ASIOChannelControls* in params, fill meter
+    kAsioSetOutputGain,             // ASIOChannelControls* in params, apply gain
+    kAsioGetOutputMeter,            // ASIOChannelControls* in params, fill meter
+    kAsioCanInputMonitor,           // no arguments for kAsioCanXXX selectors
+    kAsioCanTimeInfo,
+    kAsioCanTimeCode,
+    kAsioCanTransport,
+    kAsioCanInputGain,
+    kAsioCanInputMeter,
+    kAsioCanOutputGain,
+    kAsioCanOutputMeter,
+    kAsioOptionalOne,
+
+    // DSD support
+    // The following extensions are required to allow switching and control of the DSD subsystem.
+    kAsioSetIoFormat = 0x23111961,      /* ASIOIoFormat * in params. */
+    kAsioGetIoFormat = 0x23111983,      /* ASIOIoFormat * in params. */
+    kAsioCanDoIoFormat = 0x23112004,    /* ASIOIoFormat * in params. */
+
+    // Extension for drop out detection
+    kAsioCanReportOverload = 0x24042012,    /* return ASE_SUCCESS if driver can detect and report overloads */
+
+    kAsioGetInternalBufferSamples = 0x25042012  /* ASIOInternalBufferInfo * in params. Deliver size of driver internal buffering, return ASE_SUCCESS if supported */
+};
+
+typedef struct cwASIOInputMonitor {
+    long input;     // this input was set to monitor (or off), -1: all
+    long output;    // suggested output for monitoring the input (if so)
+    long gain;      // suggested gain, ranging 0 - 0x7fffffffL (-inf to +12 dB)
+    ASIOBool state; // ASIOTrue => on, ASIOFalse => off
+    long pan;       // suggested pan, 0 => all left, 0x7fffffff => right
+} ASIOInputMonitor;
+
+typedef struct cwASIOChannelControls {
+    long channel;       // on input, channel index
+    ASIOBool isInput;   // on input
+    long gain;          // on input,  ranges 0 thru 0x7fffffff
+    long meter;         // on return, ranges 0 thru 0x7fffffff
+    char future[32];
+} ASIOChannelControls;
+
+typedef struct cwASIOTransportParameters {
+    long command;       // see enum below
+    ASIOSamples samplePosition;
+    long track;
+    long trackSwitches[16]; // 512 tracks on/off
+    char future[64];
+} ASIOTransportParameters;
+
+enum cwASIOtransportCmd {
+    kTransStart = 1,
+    kTransStop,
+    kTransLocate,       // to samplePosition
+    kTransPunchIn,
+    kTransPunchOut,
+    kTransArmOn,        // track
+    kTransArmOff,       // track
+    kTransMonitorOn,    // track
+    kTransMonitorOff,   // track
+    kTransArm,          // trackSwitches
+    kTransMonitor       // trackSwitches
+};
+
+typedef long int ASIOIoFormatType;
+enum ASIOIoFormatType_e {
+    kASIOFormatInvalid = -1,
+    kASIOPCMFormat = 0,
+    kASIODSDFormat = 1,
+};
+
+typedef struct cwASIOIoFormat {
+    ASIOIoFormatType    FormatType;
+    char                future[512 - sizeof(ASIOIoFormatType)];
+} ASIOIoFormat;
+
+// Extension for drop detection
+// Note: Refers to buffering that goes beyond the double buffer e.g. used by USB driver designs
+typedef struct cwASIOInternalBufferInfo {
+    long inputSamples;  // size of driver's internal input buffering which is included in getLatencies
+    long outputSamples; // size of driver's internal output buffering which is included in getLatencies
+} ASIOInternalBufferInfo;
+
+
 /** Load the driver and enable the below functions.
 * If you want to use the C functions below, which are ASIO SDK compatible, then
 * you need to use ASIOLoad() to load the driver, instead of using cwASIOload().
@@ -250,7 +348,7 @@ ASIOError ASIOGetSampleRate(ASIOSampleRate *currentRate);
 ASIOError ASIOSetSampleRate(ASIOSampleRate sampleRate);
 ASIOError ASIOGetClockSources(ASIOClockSource *clocks, long *numSources);
 ASIOError ASIOSetClockSource(long reference);
-ASIOError ASIOGetSamplePosition (ASIOSamples *sPos, ASIOTimeStamp *tStamp);
+ASIOError ASIOGetSamplePosition(ASIOSamples *sPos, ASIOTimeStamp *tStamp);
 ASIOError ASIOGetChannelInfo(ASIOChannelInfo *info);
 ASIOError ASIOCreateBuffers(ASIOBufferInfo *bufferInfos, long numChannels, long bufferSize, ASIOCallbacks const *callbacks);
 ASIOError ASIODisposeBuffers(void);
