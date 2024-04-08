@@ -233,6 +233,11 @@ enum cwASIOselector {
 */
 ASIOError ASIOLoad(char const *key);
 
+/** Unload the driver and disable the below functions.
+* @return an error code, which is zero on success.
+*/
+ASIOError ASIOUnload(void);
+
 ASIOError ASIOInit(ASIODriverInfo *info);
 ASIOError ASIOExit(void);
 ASIOError ASIOStart(void);

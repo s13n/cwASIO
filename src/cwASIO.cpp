@@ -17,7 +17,6 @@
 
 
 static IASIO *theAsioDriver = nullptr;
-static CLSID clsid{};
 
 
 ASIOError ASIOLoad(char const* path) {
@@ -28,29 +27,20 @@ ASIOError ASIOLoad(char const* path) {
     return theAsioDriver ? ASE_OK : ASE_NotPresent;
 }
 
-ASIOError ASIOInit(ASIODriverInfo *info) {
-    if(theAsioDriver || !info)
+ASIOError ASIOUnload(void) {
+    if (!theAsioDriver)
         return ASE_InvalidParameter;
+    cwASIOunload(theAsioDriver);
+    theAsioDriver = nullptr;
+    return ASE_OK;
+}
 
-    CComPtr<IClassFactory> factory;
-    HRESULT hr = ::CoGetClassObject(clsid, CLSCTX_INPROC_SERVER, NULL, IID_IClassFactory, (void**)&factory);
-    if(FAILED(hr)) {
-        strcpy_s(info->errorMessage, sizeof(info->errorMessage), "getting class factory");
-        return ASE_NotPresent;
-    }
-    void *instance;
-    hr = factory->CreateInstance(NULL, clsid, &instance);
-    if(FAILED(hr) || !instance) {
-        strcpy_s(info->errorMessage, sizeof(info->errorMessage), "creating instance");
-        return ASE_NotPresent;
-    }
-    theAsioDriver = static_cast<IASIO*>(instance);
+ASIOError ASIOInit(ASIODriverInfo *info) {
     if(!theAsioDriver)
-        return ASE_NotPresent;
-    hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+        return ASE_InvalidParameter;
+    HRESULT hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(hr) && hr != S_FALSE)
         return ASE_NotPresent;
-    theAsioDriver->AddRef();
     info->asioVersion = 2;
     theAsioDriver->getDriverName(info->name);
     info->driverVersion = theAsioDriver->getDriverVersion();

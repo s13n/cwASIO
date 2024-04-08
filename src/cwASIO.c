@@ -29,6 +29,14 @@ ASIOError ASIOLoad(char const *path) {
     return cwASIOload(path, &driverIfc);
 }
 
+ASIOError ASIOUnload(void) {
+    if (!driverIfc.driverLib)
+        return ASE_InvalidParameter;
+    cwASIOunload(&driverIfc);
+    driverIfc.driverLib = nullptr;
+    return ASE_OK;
+}
+
 ASIOError ASIOInit(ASIODriverInfo *info) {
     if(theAsioDriver || !driverIfc.driverLib)
         return ASE_NotPresent;
