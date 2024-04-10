@@ -33,7 +33,7 @@ ASIOError ASIOUnload(void) {
     if (!driverIfc.driverLib)
         return ASE_InvalidParameter;
     cwASIOunload(&driverIfc);
-    driverIfc.driverLib = nullptr;
+    driverIfc.driverLib = NULL;
     return ASE_OK;
 }
 
