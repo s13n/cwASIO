@@ -26,10 +26,10 @@ if(WIN32)
         PUBLIC_HEADER "cwASIO.h;cwASIOifc.hpp"
     )
 
-    find_path(ATL_HEADER atlbase.h REQUIRED DOC "ATL atlbase.h header file")
-    message(VERBOSE "Using atlbase.h in folder ${ATL_HEADER}")
-    find_path(UNK_HEADER unknwn.h REQUIRED DOC "COM unknwn.h header file")
-    message(VERBOSE "Using unknwn.h in folder ${UNK_HEADER}")
+    find_package(MFC)
+    if(NOT MFC_FOUND)
+        message(FATAL_ERROR "MFC was not found, please install Desktop development with C++ / MFC for newest build tools!")
+    endif()
 else()
     target_sources(cwASIO_lib
     PUBLIC
