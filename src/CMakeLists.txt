@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
+include(FetchContent)
+
 option(CWASIO_SHARED "Build cwASIO as a shared library" ${BUILD_SHARED_LIBS})
 if(CWASIO_SHARED)
     set(CWASIO_LIBTYPE SHARED)
@@ -12,6 +14,33 @@ message(VERBOSE "Building cwASIO as a ${CWASIO_LIBTYPE} library")
 add_library(cwASIO::lib ALIAS cwASIO_lib)
 
 if(WIN32)
+    option(CWASIO_USE_WTL4MINGW "Use WTL4MinGW instead of Microsoft ATL" OFF)
+    if(CWASIO_USE_WTL4MINGW)
+        set(CWASIO_USE_WTL4MINGW_REPO "https://github.com/aholzinger/WTL4MinGW.git" CACHE STRING "wtl4mingw repository to use")
+        if(NOT CWASIO_USE_WTL4MINGW_TAG)
+            if($ENV{CWASIO_USE_WTL4MINGW_TAG})
+                set(CWASIO_USE_WTL4MINGW_TAG $ENV{CWASIO_USE_WTL4MINGW_TAG})
+            else()
+              set(CWASIO_USE_WTL4MINGW_TAG "30cc7061c3da423ab4c622ad6d07682d3781afb4")   # set default tag, when neither cache nor environment variable found.
+            endif()
+        endif()
+
+        FetchContent_Declare(WTL4MinGW_build
+            GIT_TAG         ${CWASIO_USE_WTL4MINGW_TAG}
+            GIT_REPOSITORY  ${CWASIO_USE_WTL4MINGW_REPO}
+        )
+        message(STATUS "Fetching wtl4mingw sources ${CWASIO_USE_WTL4MINGW_TAG} from git at ${CWASIO_USE_WTL4MINGW_REPO}")
+        FetchContent_GetProperties(wtl4mingw_build)
+        if(NOT wtl4mingw_build_POPULATED)
+            FetchContent_Populate(wtl4mingw_build)
+            message(STATUS "Building wtl4mingw in ${wtl4mingw_build_BINARY_DIR} from sources in ${wtl4mingw_build_SOURCE_DIR}")
+            add_subdirectory(${wtl4mingw_build_SOURCE_DIR} ${wtl4mingw_build_BINARY_DIR} EXCLUDE_FROM_ALL)
+        endif()
+        target_include_directories(cwASIO_lib PRIVATE ${wtl4mingw_build_SOURCE_DIR}/src/atlport/include)
+        target_include_directories(cwASIO_lib PRIVATE ${wtl4mingw_build_SOURCE_DIR}/src/stdext/include)
+        target_include_directories(cwASIO_lib PRIVATE ${wtl4mingw_build_SOURCE_DIR}/src/wtl/include)
+    endif()
+
     target_sources(cwASIO_lib
     PUBLIC
         cwASIO.h

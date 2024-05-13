@@ -9,11 +9,12 @@
  */
 
 #include "cwASIOifc.hpp"
-#include <atlbase.h>
 #include <cstring>
 #include <memory>
 #include <string>
 #include <type_traits>
+
+#include "atlbase.h"
 
 
 static IASIO *theAsioDriver = nullptr;
