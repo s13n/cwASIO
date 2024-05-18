@@ -41,6 +41,37 @@ struct cwASIO_DriverInterface {
     long (*outputReady)(struct AsioDriver *);
 };
 
+struct cwASIO_DriverVtbl {
+    long (*QueryInterface)(AsioDriver *, GUID *, void **);
+    unsigned long (*AddRefPtr)(AsioDriver *);
+    unsigned long (*ReleasePtr)(AsioDriver *);
+    ASIOBool (*init)(void *);
+    void (*getDriverName)(struct AsioDriver *, char *);
+    long (*getDriverVersion)(struct AsioDriver *);
+    void (*getErrorMessage)(struct AsioDriver *, char *);
+    ASIOError (*start)(struct AsioDriver *);
+    ASIOError (*stop)(struct AsioDriver *);
+    ASIOError (*getChannels)(struct AsioDriver *, long *, long *);
+    ASIOError (*getLatencies)(struct AsioDriver *, long *, long *);
+    ASIOError (*getBufferSize)(struct AsioDriver *, long *, long *, long *, long *);
+    ASIOError (*canSampleRate)(struct AsioDriver *, double);
+    ASIOError (*getSampleRate)(struct AsioDriver *, double *);
+    ASIOError (*setSampleRate)(struct AsioDriver *, double);
+    ASIOError (*getClockSources)(struct AsioDriver *, ASIOClockSource *, long *);
+    ASIOError (*setClockSource)(struct AsioDriver *, long);
+    ASIOError (*getSamplePosition)(struct AsioDriver *, ASIOSamples *, ASIOTimeStamp *);
+    ASIOError (*getChannelInfo)(struct AsioDriver *, ASIOChannelInfo *);
+    ASIOError (*createBuffers)(struct AsioDriver *, ASIOBufferInfo *, long , long , ASIOCallbacks const *);
+    ASIOError (*disposeBuffers)(struct AsioDriver *);
+    ASIOError (*controlPanel)(struct AsioDriver *);
+    ASIOError (*future)(struct AsioDriver *, long, void *);
+    ASIOError (*outputReady)(struct AsioDriver *);
+};
+
+struct AsioDriver {
+    struct cwASIO_DriverVtbl *vtbl;
+};
+
 typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
 
 /** Enumerate devices from /etc/cwASIO.
