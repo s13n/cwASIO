@@ -9,154 +9,197 @@
  */
 
 #include "cwASIOifc.hpp"
-#include "atlbase.h"
 #include <cstring>
 #include <memory>
 #include <string>
 #include <type_traits>
 
+#if CWASIO_USE_WTL4MINGW
+    #include "atlport/include/atlbase.h"
+#else
+    #include <atlbase.h>
+#endif
 
-static IASIO *theAsioDriver = nullptr;
+struct AsioDriver {
+    IASIO *theAsioDriver_;
+    unsigned initCounter_;
+
+    AsioDriver() : theAsioDriver_(nullptr), initCounter_(0) {}
+    AsioDriver(IASIO *theAsioDriver) : theAsioDriver_(theAsioDriver), initCounter_(0) {}
+    IASIO *get() {
+        return theAsioDriver_;
+    }
+    IASIO *operator=(IASIO *theAsioDriver) {
+        theAsioDriver_ = theAsioDriver;
+        if (!theAsioDriver_)
+            initCounter_ = 0;
+        return theAsioDriver_;
+    }
+    void addRef() {
+        ++initCounter_;
+    }
+    bool decRef() {
+        if (initCounter_ == 0)
+            return false;
+        --initCounter_;
+        return true;
+    }
+};
+
+static AsioDriver theAsioDriver;
 
 
 ASIOError ASIOLoad(char const* path) {
-    if (theAsioDriver)
+    if (theAsioDriver.get())
+        return ASE_NoMemory;
+    HRESULT hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (FAILED(hr) && hr != S_FALSE)
         return ASE_NoMemory;
     HRESULT hres;
     theAsioDriver = cwASIOload(path, hres);
-    return theAsioDriver ? ASE_OK : ASE_NotPresent;
+    if (!theAsioDriver.get()) {
+        ::CoUninitialize();
+        return ASE_NotPresent;
+    }
+    return ASE_OK;
 }
 
 ASIOError ASIOUnload(void) {
-    if (!theAsioDriver)
-        return ASE_InvalidParameter;
-    cwASIOunload(theAsioDriver);
+    if (!theAsioDriver.get())
+        return ASE_InvalidParameter; // do not call CoUninitialize here, because it wasn't yet called
+    cwASIOunload(theAsioDriver.get());
     theAsioDriver = nullptr;
+    ::CoUninitialize();
     return ASE_OK;
 }
 
 ASIOError ASIOInit(ASIODriverInfo *info) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_InvalidParameter;
     HRESULT hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(hr) && hr != S_FALSE)
         return ASE_NotPresent;
     info->asioVersion = 2;
-    theAsioDriver->getDriverName(info->name);
-    info->driverVersion = theAsioDriver->getDriverVersion();
-    theAsioDriver->getErrorMessage(info->errorMessage);
+    theAsioDriver.get()->getDriverName(info->name);
+    info->driverVersion = theAsioDriver.get()->getDriverVersion();
+    if (!theAsioDriver.get()->init(info->sysRef)) {
+        theAsioDriver.get()->getErrorMessage(info->errorMessage);
+        ::CoUninitialize();
+        return ASE_HWMalfunction;
+    }
+    info->errorMessage[0] = '\0';
+    theAsioDriver.addRef();
     return ASE_OK;
 }
 
 ASIOError ASIOExit(void) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    theAsioDriver->Release();
-    ::CoUninitialize();
-    theAsioDriver = 0;
+    if (theAsioDriver.decRef())
+        ::CoUninitialize();
     return ASE_OK;
 }
 
 ASIOError ASIOStart(void) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->start();
+    return theAsioDriver.get()->start();
 }
 
 ASIOError ASIOStop(void) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->stop();
+    return theAsioDriver.get()->stop();
 }
 
 ASIOError ASIOGetChannels(long *numInputChannels, long *numOutputChannels) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->getChannels(numInputChannels, numOutputChannels);
+    return theAsioDriver.get()->getChannels(numInputChannels, numOutputChannels);
 }
 
 ASIOError ASIOGetLatencies(long *inputLatency, long *outputLatency) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->getLatencies(inputLatency, outputLatency);
+    return theAsioDriver.get()->getLatencies(inputLatency, outputLatency);
 }
 
 ASIOError ASIOGetBufferSize(long *minSize, long *maxSize, long *preferredSize, long *granularity) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->getBufferSize(minSize, maxSize, preferredSize, granularity);
+    return theAsioDriver.get()->getBufferSize(minSize, maxSize, preferredSize, granularity);
 }
 
 ASIOError ASIOCanSampleRate(ASIOSampleRate sampleRate) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->canSampleRate(sampleRate);
+    return theAsioDriver.get()->canSampleRate(sampleRate);
 }
 
 ASIOError ASIOGetSampleRate(ASIOSampleRate *currentRate) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->getSampleRate(currentRate);
+    return theAsioDriver.get()->getSampleRate(currentRate);
 }
 
 ASIOError ASIOSetSampleRate(ASIOSampleRate sampleRate) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->setSampleRate(sampleRate);
+    return theAsioDriver.get()->setSampleRate(sampleRate);
 }
 
 ASIOError ASIOGetClockSources(ASIOClockSource *clocks, long *numSources) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->getClockSources(clocks, numSources);
+    return theAsioDriver.get()->getClockSources(clocks, numSources);
 }
 
 ASIOError ASIOSetClockSource(long reference) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->setClockSource(reference);
+    return theAsioDriver.get()->setClockSource(reference);
 }
 
 ASIOError ASIOGetSamplePosition (ASIOSamples *sPos, ASIOTimeStamp *tStamp) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->getSamplePosition(sPos, tStamp);
+    return theAsioDriver.get()->getSamplePosition(sPos, tStamp);
 }
 
 ASIOError ASIOGetChannelInfo(ASIOChannelInfo *info) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->getChannelInfo(info);
+    return theAsioDriver.get()->getChannelInfo(info);
 }
 
 ASIOError ASIOCreateBuffers(ASIOBufferInfo *bufferInfos, long numChannels, long bufferSize, ASIOCallbacks const *callbacks) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->createBuffers(bufferInfos, numChannels, bufferSize, callbacks);
+    return theAsioDriver.get()->createBuffers(bufferInfos, numChannels, bufferSize, callbacks);
 }
 
 ASIOError ASIODisposeBuffers(void) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->disposeBuffers();
+    return theAsioDriver.get()->disposeBuffers();
 }
 
 ASIOError ASIOControlPanel(void) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->controlPanel();
+    return theAsioDriver.get()->controlPanel();
 }
 
 ASIOError ASIOFuture(long selector, void *params) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->future(selector, params);
+    return theAsioDriver.get()->future(selector, params);
 }
 
 ASIOError ASIOOutputReady(void) {
-    if(!theAsioDriver)
+    if(!theAsioDriver.get())
         return ASE_NotPresent;
-    return theAsioDriver->outputReady();
+    return theAsioDriver.get()->outputReady();
 }
 
 
@@ -238,7 +281,6 @@ IASIO *cwASIOload(char const *key, HRESULT &res) {
     res = factory->CreateInstance(NULL, id, &instance);
     if (FAILED(res) || !instance)
         return nullptr;
-    static_cast<IASIO*>(instance)->AddRef();
     return static_cast<IASIO*>(instance);
 }
 
