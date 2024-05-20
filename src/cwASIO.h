@@ -114,7 +114,7 @@ typedef struct cwASIOBufferInfo {
     void *buffers[2];           //!< on output: double buffer addresses
 } ASIOBufferInfo;
 
-typedef struct cwAsioTimeInfo {
+typedef struct cwASIOTimeInfo {
     double speed;               //!< absolute speed (1. = nominal)
     ASIOTimeStamp systemTime;   //!< system time related to samplePosition, in nanoseconds on mac, must be derived from Microseconds() (not UpTime()!) on windows, must be derived from timeGetTime()
     ASIOSamples samplePosition;
@@ -123,7 +123,7 @@ typedef struct cwAsioTimeInfo {
     char reserved[12];
 } AsioTimeInfo;
 
-typedef enum cwAsioTimeInfoFlags {
+typedef enum cwASIOTimeInfoFlags {
     kSystemTimeValid = 1,           //!< must always be valid
     kSamplePositionValid = 1 << 1,  //!< must always be valid
     kSampleRateValid = 1 << 2,
@@ -198,7 +198,7 @@ typedef struct cwASIOCallbacks {
 } ASIOCallbacks;
 
 //! asioMessage selectors
-enum cwASIOmessageSel {
+enum cwASIOMessageSel {
     kAsioSelectorSupported = 1, //!< selector in <value>, returns 1L if supported, 0 otherwise
     kAsioEngineVersion,         //!< returns engine (host) asio implementation version, 2 or higher
 
@@ -237,7 +237,7 @@ enum cwASIOmessageSel {
     kAsioNumMessageSelectors
 };
 
-enum cwASIOfutureSel {
+enum cwASIOFutureSel {
     kAsioEnableTimeCodeRead = 1,    //!< no arguments
     kAsioDisableTimeCodeRead,       //!< no arguments
     kAsioSetInputMonitor,           //!< ASIOInputMonitor* in params
