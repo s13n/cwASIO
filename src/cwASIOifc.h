@@ -16,10 +16,7 @@
 struct AsioDriver;
 
 struct GUID {
-    uint32_t data1;
-    uint16_t data2;
-    uint16_t data3;
-    uint8_t  data4[8];
+    uint8_t data[16];
 };
 
 struct cwASIO_DriverInterface {
