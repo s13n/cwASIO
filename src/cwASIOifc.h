@@ -11,10 +11,16 @@
 
 #include "cwASIO.h"
 #include <stdbool.h>
-
+#include <stdint.h>
 
 struct AsioDriver;
-struct GUID;
+
+struct GUID {
+    uint32_t data1;
+    uint16_t data2;
+    uint16_t data3;
+    uint8_t  data4[8];
+};
 
 struct cwASIO_DriverInterface {
     void *driverLib;
