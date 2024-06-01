@@ -56,9 +56,11 @@ if(WIN32)
 
     target_sources(cwASIO_lib
     PUBLIC
+        asio.h
         cwASIO.h
         cwASIOifc.hpp
     PRIVATE
+        asio.c
         cwASIO.c
         cwASIO.cpp
     )
@@ -71,9 +73,11 @@ if(WIN32)
 else()
     target_sources(cwASIO_lib
     PUBLIC
+        asio.h
         cwASIO.h
         cwASIOifc.h
     PRIVATE
+        asio.c
         cwASIO.c
     )
     
