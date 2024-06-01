@@ -22,7 +22,10 @@
 struct AsioDriver;
 
 struct GUID {
-    uint8_t data[16];
+    unsigned long  data1;
+    unsigned short data2;
+    unsigned short data3;
+    unsigned char  data4[8];
 };
 
 struct cwASIO_DriverInterface {
