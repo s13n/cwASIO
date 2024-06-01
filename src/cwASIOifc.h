@@ -13,6 +13,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef _WIN32
+#   define CWASIO_METHOD __stdcall     // only relevant in 32-bit Windows
+#else
+#   define CWASIO_METHOD
+#endif
+
 struct AsioDriver;
 
 struct GUID {
@@ -46,30 +52,30 @@ struct cwASIO_DriverInterface {
 };
 
 struct cwASIO_DriverVtbl {
-    long (*QueryInterface)(struct AsioDriver *, struct GUID const *, void **);
-    unsigned long (*AddRef)(struct AsioDriver *);
-    unsigned long (*Release)(struct AsioDriver *);
-    ASIOBool (*init)(struct AsioDriver*, void *);
-    void (*getDriverName)(struct AsioDriver *, char *);
-    long (*getDriverVersion)(struct AsioDriver *);
-    void (*getErrorMessage)(struct AsioDriver *, char *);
-    ASIOError (*start)(struct AsioDriver *);
-    ASIOError (*stop)(struct AsioDriver *);
-    ASIOError (*getChannels)(struct AsioDriver *, long *, long *);
-    ASIOError (*getLatencies)(struct AsioDriver *, long *, long *);
-    ASIOError (*getBufferSize)(struct AsioDriver *, long *, long *, long *, long *);
-    ASIOError (*canSampleRate)(struct AsioDriver *, double);
-    ASIOError (*getSampleRate)(struct AsioDriver *, double *);
-    ASIOError (*setSampleRate)(struct AsioDriver *, double);
-    ASIOError (*getClockSources)(struct AsioDriver *, ASIOClockSource *, long *);
-    ASIOError (*setClockSource)(struct AsioDriver *, long);
-    ASIOError (*getSamplePosition)(struct AsioDriver *, ASIOSamples *, ASIOTimeStamp *);
-    ASIOError (*getChannelInfo)(struct AsioDriver *, ASIOChannelInfo *);
-    ASIOError (*createBuffers)(struct AsioDriver *, ASIOBufferInfo *, long , long , ASIOCallbacks const *);
-    ASIOError (*disposeBuffers)(struct AsioDriver *);
-    ASIOError (*controlPanel)(struct AsioDriver *);
-    ASIOError (*future)(struct AsioDriver *, long, void *);
-    ASIOError (*outputReady)(struct AsioDriver *);
+    long (CWASIO_METHOD *QueryInterface)(struct AsioDriver *, struct GUID const *, void **);
+    unsigned long (CWASIO_METHOD *AddRef)(struct AsioDriver *);
+    unsigned long (CWASIO_METHOD *Release)(struct AsioDriver *);
+    ASIOBool (CWASIO_METHOD *init)(struct AsioDriver*, void *);
+    void (CWASIO_METHOD *getDriverName)(struct AsioDriver *, char *);
+    long (CWASIO_METHOD *getDriverVersion)(struct AsioDriver *);
+    void (CWASIO_METHOD *getErrorMessage)(struct AsioDriver *, char *);
+    ASIOError (CWASIO_METHOD *start)(struct AsioDriver *);
+    ASIOError (CWASIO_METHOD *stop)(struct AsioDriver *);
+    ASIOError (CWASIO_METHOD *getChannels)(struct AsioDriver *, long *, long *);
+    ASIOError (CWASIO_METHOD *getLatencies)(struct AsioDriver *, long *, long *);
+    ASIOError (CWASIO_METHOD *getBufferSize)(struct AsioDriver *, long *, long *, long *, long *);
+    ASIOError (CWASIO_METHOD *canSampleRate)(struct AsioDriver *, double);
+    ASIOError (CWASIO_METHOD *getSampleRate)(struct AsioDriver *, double *);
+    ASIOError (CWASIO_METHOD *setSampleRate)(struct AsioDriver *, double);
+    ASIOError (CWASIO_METHOD *getClockSources)(struct AsioDriver *, ASIOClockSource *, long *);
+    ASIOError (CWASIO_METHOD *setClockSource)(struct AsioDriver *, long);
+    ASIOError (CWASIO_METHOD *getSamplePosition)(struct AsioDriver *, ASIOSamples *, ASIOTimeStamp *);
+    ASIOError (CWASIO_METHOD *getChannelInfo)(struct AsioDriver *, ASIOChannelInfo *);
+    ASIOError (CWASIO_METHOD *createBuffers)(struct AsioDriver *, ASIOBufferInfo *, long , long , ASIOCallbacks const *);
+    ASIOError (CWASIO_METHOD *disposeBuffers)(struct AsioDriver *);
+    ASIOError (CWASIO_METHOD *controlPanel)(struct AsioDriver *);
+    ASIOError (CWASIO_METHOD *future)(struct AsioDriver *, long, void *);
+    ASIOError (CWASIO_METHOD *outputReady)(struct AsioDriver *);
 };
 
 struct AsioDriver {
