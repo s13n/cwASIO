@@ -183,74 +183,14 @@ long cwASIOload(char const *path, struct AsioDriver **drv) {
     void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
         return ASE_NotPresent;
-    ifc->instantiate = (struct AsioDriver *(*)(void *))dlsym(lib, "cwASIOinstantiate");
-    if(!ifc->instantiate)
+    
+    struct AsioDriver *(*factory)(void)) = dlsym(lib, "driverFactory");
+    if (!factory)
         return ASE_NotPresent;
-    ifc->discard = (void (*)(struct AsioDriver *))dlsym(lib, "cwASIOdiscard");
-    if(!ifc->discard)
-        return ASE_NotPresent;
-    ifc->getDriverName = (void (*)(struct AsioDriver *, char *))dlsym(lib, "cwASIOgetDriverName");
-    if(!ifc->getDriverName)
-        return ASE_NotPresent;
-    ifc->getDriverVersion = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOgetDriverVersion");
-    if(!ifc->getDriverVersion)
-        return ASE_NotPresent;
-    ifc->getErrorMessage = (void (*)(struct AsioDriver *, char *))dlsym(lib, "cwASIOgetErrorMessage");
-    if(!ifc->getErrorMessage)
-        return ASE_NotPresent;
-    ifc->start = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOstart");
-    if(!ifc->start)
-        return ASE_NotPresent;
-    ifc->stop = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOstop");
-    if(!ifc->stop)
-        return ASE_NotPresent;
-    ifc->getChannels = (long (*)(struct AsioDriver *, long *, long *))dlsym(lib, "cwASIOgetChannels");
-    if(!ifc->getChannels)
-        return ASE_NotPresent;
-    ifc->getLatencies = (long (*)(struct AsioDriver *, long *, long *))dlsym(lib, "cwASIOgetLatencies");
-    if(!ifc->getLatencies)
-        return ASE_NotPresent;
-    ifc->getBufferSize = (long (*)(struct AsioDriver *, long *, long *, long *, long *))dlsym(lib, "cwASIOgetBufferSize");
-    if(!ifc->getBufferSize)
-        return ASE_NotPresent;
-    ifc->canSampleRate = (long (*)(struct AsioDriver *, double))dlsym(lib, "cwASIOcanSampleRate");
-    if(!ifc->canSampleRate)
-        return ASE_NotPresent;
-    ifc->getSampleRate = (long (*)(struct AsioDriver *, double *))dlsym(lib, "cwASIOgetSampleRate");
-    if(!ifc->getSampleRate)
-        return ASE_NotPresent;
-    ifc->setSampleRate = (long (*)(struct AsioDriver *, double))dlsym(lib, "cwASIOsetSampleRate");
-    if(!ifc->setSampleRate)
-        return ASE_NotPresent;
-    ifc->getClockSources = (long (*)(struct AsioDriver *, ASIOClockSource *, long *))dlsym(lib, "cwASIOgetClockSources");
-    if(!ifc->getClockSources)
-        return ASE_NotPresent;
-    ifc->setClockSource = (long (*)(struct AsioDriver *, long))dlsym(lib, "cwASIOsetClockSource");
-    if(!ifc->setClockSource)
-        return ASE_NotPresent;
-    ifc->getSamplePosition = (long (*)(struct AsioDriver *, ASIOSamples *, ASIOTimeStamp *))dlsym(lib, "cwASIOgetSamplePosition");
-    if(!ifc->getSamplePosition)
-        return ASE_NotPresent;
-    ifc->getChannelInfo = (long (*)(struct AsioDriver *, ASIOChannelInfo *))dlsym(lib, "cwASIOgetChannelInfo");
-    if(!ifc->getChannelInfo)
-        return ASE_NotPresent;
-    ifc->createBuffers = (long (*)(struct AsioDriver *, ASIOBufferInfo *, long , long , ASIOCallbacks const *))dlsym(lib, "cwASIOcreateBuffers");
-    if(!ifc->createBuffers)
-        return ASE_NotPresent;
-    ifc->disposeBuffers = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOdisposeBuffers");
-    if(!ifc->disposeBuffers)
-        return ASE_NotPresent;
-    ifc->controlPanel = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOcontrolPanel");
-    if(!ifc->controlPanel)
-        return ASE_NotPresent;
-    ifc->future = (long (*)(struct AsioDriver *, long, void *))dlsym(lib, "cwASIOfuture");
-    if(!ifc->future)
-        return ASE_NotPresent;
-    ifc->outputReady = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOoutputReady");
-    if(!ifc->outputReady)
-        return ASE_NotPresent;
-    ifc->driverLib = lib;
-    return ASE_OK;
+
+    *drv = factory();
+
+    return *drv ? ASE_OK : ASE_NotPresent;
 #endif
 }
 
