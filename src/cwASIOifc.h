@@ -46,9 +46,9 @@ struct cwASIO_DriverInterface {
 };
 
 struct cwASIO_DriverVtbl {
-    long (*QueryInterface)(struct AsioDriver *, struct GUID *, void **);
-    unsigned long (*AddRefPtr)(struct AsioDriver *);
-    unsigned long (*ReleasePtr)(struct AsioDriver *);
+    long (*QueryInterface)(struct AsioDriver *, struct GUID const *, void **);
+    unsigned long (*AddRef)(struct AsioDriver *);
+    unsigned long (*Release)(struct AsioDriver *);
     ASIOBool (*init)(struct AsioDriver*, void *);
     void (*getDriverName)(struct AsioDriver *, char *);
     long (*getDriverVersion)(struct AsioDriver *);
