@@ -28,32 +28,6 @@ struct GUID {
     unsigned char  data4[8];
 };
 
-struct cwASIO_DriverInterface {
-    void *driverLib;
-    struct AsioDriver *(*instantiate)(void *);
-    void (*discard)(struct AsioDriver *);
-    void (*getDriverName)(struct AsioDriver *, char *);
-    long (*getDriverVersion)(struct AsioDriver *);
-    void (*getErrorMessage)(struct AsioDriver *, char *);
-    long (*start)(struct AsioDriver *);
-    long (*stop)(struct AsioDriver *);
-    long (*getChannels)(struct AsioDriver *, long *, long *);
-    long (*getLatencies)(struct AsioDriver *, long *, long *);
-    long (*getBufferSize)(struct AsioDriver *, long *, long *, long *, long *);
-    long (*canSampleRate)(struct AsioDriver *, double);
-    long (*getSampleRate)(struct AsioDriver *, double *);
-    long (*setSampleRate)(struct AsioDriver *, double);
-    long (*getClockSources)(struct AsioDriver *, ASIOClockSource *, long *);
-    long (*setClockSource)(struct AsioDriver *, long);
-    long (*getSamplePosition)(struct AsioDriver *, ASIOSamples *, ASIOTimeStamp *);
-    long (*getChannelInfo)(struct AsioDriver *, ASIOChannelInfo *);
-    long (*createBuffers)(struct AsioDriver *, ASIOBufferInfo *, long , long , ASIOCallbacks const *);
-    long (*disposeBuffers)(struct AsioDriver *);
-    long (*controlPanel)(struct AsioDriver *);
-    long (*future)(struct AsioDriver *, long, void *);
-    long (*outputReady)(struct AsioDriver *);
-};
-
 struct cwASIO_DriverVtbl {
     long (CWASIO_METHOD *QueryInterface)(struct AsioDriver *, struct GUID const *, void **);
     unsigned long (CWASIO_METHOD *AddRef)(struct AsioDriver *);
@@ -82,7 +56,7 @@ struct cwASIO_DriverVtbl {
 };
 
 struct AsioDriver {
-    struct cwASIO_DriverVtbl *vtbl;
+    struct cwASIO_DriverVtbl const *vtbl;
 };
 
 typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
@@ -100,14 +74,14 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context);
 
 /** Load the ASIO driver.
 * @param key On Linux, the file path of the driver to load.
-* @param ifc Pointer to the driver interface to be initialized.
+* @param drv Receives a pointer to the driver instance.
 * @return an error code when unsuccessful, zero on success.
 */
-long cwASIOload(char const *key, struct cwASIO_DriverInterface *ifc);
+long cwASIOload(char const *key, struct AsioDriver **drv);
 
 /** Unload the ASIO driver.
 * @param ifc Pointer to the driver interface that was initialized by cwASIOload()
 */
-void cwASIOunload(struct cwASIO_DriverInterface *ifc);
+void cwASIOunload(struct AsioDriver *ifc);
 
 /** @}*/

@@ -59,6 +59,7 @@ if(WIN32)
         cwASIO.h
         cwASIOifc.hpp
     PRIVATE
+        cwASIO.c
         cwASIO.cpp
     )
     
