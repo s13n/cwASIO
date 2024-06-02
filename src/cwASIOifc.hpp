@@ -167,7 +167,7 @@ namespace cwASIO {
             cwASIOTimeStamp ats;
             if(auto err = drv_->vtbl->getSamplePosition(drv_, &asp, &ats))
                 return std::unexpected(std::error_code(err, err_category()));
-            return { std::chrono::nanoseconds(qWord(ats)), qWord(asp) };
+            return SamplePosition{ std::chrono::nanoseconds(qWord(ats)), qWord(asp) };
         }
 
         cwASIOError getChannelInfo(cwASIOChannelInfo &info) {
