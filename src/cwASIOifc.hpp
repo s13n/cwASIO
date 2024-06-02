@@ -61,7 +61,7 @@ namespace cwASIO {
         return uint64_t(val);
     };
 
-    using SamplePosition = std::tuple<long, std::chrono::nanoseconds, uint64_t>;
+    using SamplePosition = std::tuple<std::chrono::nanoseconds, uint64_t>;
 
     struct Driver {
     private:
@@ -137,7 +137,7 @@ namespace cwASIO {
             double sampleRate;
             auto err = drv_->vtbl->getSampleRate(drv_, &sampleRate);
             if (err)
-                return std::unexpected(std::error_code(err, asio_category()));
+                return std::unexpected(std::error_code(err, err_category()));
             return sampleRate;
         }
 
@@ -154,7 +154,7 @@ namespace cwASIO {
                 err = drv_->vtbl->getClockSources(drv_, clocks.data(), &numSources);
             }
             if (err)
-                return std::unexpected(std::error_code(err, asio_category()));
+                return std::unexpected(std::error_code(err, err_category()));
             return clocks;
         }
 
@@ -162,11 +162,12 @@ namespace cwASIO {
             return drv_->vtbl->setClockSource(drv_, reference);
         }
 
-        SamplePosition getSamplePosition() {
+        std::expected<SamplePosition, std::error_code> getSamplePosition() {
             cwASIOSamples asp;
             cwASIOTimeStamp ats;
-            auto err = drv_->vtbl->getSamplePosition(drv_, &asp, &ats);
-            return { err, std::chrono::nanoseconds(qWord(ats)), qWord(asp) };
+            if(auto err = drv_->vtbl->getSamplePosition(drv_, &asp, &ats))
+                return std::unexpected(std::error_code(err, err_category()));
+            return { std::chrono::nanoseconds(qWord(ats)), qWord(asp) };
         }
 
         cwASIOError getChannelInfo(cwASIOChannelInfo &info) {
