@@ -61,7 +61,10 @@ namespace cwASIO {
         return uint64_t(val);
     };
 
-    using SamplePosition = std::tuple<std::chrono::nanoseconds, uint64_t>;
+    struct SamplePosition {
+        std::chrono::nanoseconds systemTime;
+        uint64_t samplePosition;
+    };
 
     struct Driver {
     private:
