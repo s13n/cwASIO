@@ -10,6 +10,8 @@
 
 #include "asio.h"
 #include "cwASIOifc.h"
+#include <stdlib.h>
+
 
 static struct AsioDriver *theAsioDriver = NULL;
 

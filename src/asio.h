@@ -11,6 +11,28 @@
 
 #include "cwASIO.h"
 
+typedef cwASIOTimeStamp ASIOTimeStamp;
+typedef cwASIOSamples ASIOSamples;
+typedef cwASIOSampleRate ASIOSampleRate;
+typedef cwASIOBool ASIOBool;
+typedef cwASIOError ASIOError;
+typedef cwASIOSampleType ASIOSampleType;
+typedef struct cwASIODriverInfo ASIODriverInfo;
+typedef struct cwASIOClockSource ASIOClockSource;
+typedef struct cwASIOChannelInfo ASIOChannelInfo;
+typedef struct cwASIOBufferInfo ASIOBufferInfo;
+typedef struct cwASIOTimeInfo AsioTimeInfo;
+typedef enum cwASIOTimeInfoFlags AsioTimeInfoFlags;
+typedef struct cwASIOTimeCode ASIOTimeCode;
+typedef enum cwASIOTimeCodeFlags ASIOTimeCodeFlags;
+typedef struct cwASIOTime ASIOTime;
+typedef struct cwASIOCallbacks ASIOCallbacks;
+typedef struct cwASIOInputMonitor ASIOInputMonitor;
+typedef struct cwASIOChannelControls ASIOChannelControls;
+typedef struct cwASIOTransportParameters ASIOTransportParameters;
+typedef struct cwASIOIoFormat ASIOIoFormat;
+typedef struct cwASIOInternalBufferInfo ASIOInternalBufferInfo;
+
 /** Load the driver and enable the below functions.
 * If you want to use the C functions below, which are ASIO SDK compatible, then
 * you need to use ASIOLoad() to load the driver, instead of using cwASIOload().

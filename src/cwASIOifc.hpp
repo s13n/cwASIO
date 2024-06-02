@@ -28,11 +28,11 @@ __interface IASIO : public IUnknown {
     virtual long canSampleRate(double sampleRate) = 0;
     virtual long getSampleRate(double *sampleRate) = 0;
     virtual long setSampleRate(double sampleRate) = 0;
-    virtual long getClockSources(ASIOClockSource *clocks, long *numSources) = 0;
+    virtual long getClockSources(cwASIOClockSource *clocks, long *numSources) = 0;
     virtual long setClockSource(long reference) = 0;
-    virtual long getSamplePosition(ASIOSamples *sPos, ASIOTimeStamp *tStamp) = 0;
-    virtual long getChannelInfo(ASIOChannelInfo *info) = 0;
-    virtual long createBuffers(ASIOBufferInfo *bufferInfos, long numChannels, long bufferSize, ASIOCallbacks const *callbacks) = 0;
+    virtual long getSamplePosition(cwASIOSamples *sPos, cwASIOTimeStamp *tStamp) = 0;
+    virtual long getChannelInfo(cwASIOChannelInfo *info) = 0;
+    virtual long createBuffers(cwASIOBufferInfo *bufferInfos, long numChannels, long bufferSize, cwASIOCallbacks const *callbacks) = 0;
     virtual long disposeBuffers() = 0;
     virtual long controlPanel() = 0;
     virtual long future(long selector, void *opt) = 0;

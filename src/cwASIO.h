@@ -14,27 +14,27 @@
     typedef struct cwASIOTimeStamp {
         unsigned long hi;
         unsigned long lo;
-    } ASIOTimeStamp;
+    } cwASIOTimeStamp;
     typedef struct cwASIOSamples {
         unsigned long hi;
         unsigned long lo;
-    } ASIOSamples;
+    } cwASIOSamples;
 #else
 #   define NATIVE_INT64 1
-    typedef long long int ASIOTimeStamp;
-    typedef long long int ASIOSamples;
+    typedef long long int cwASIOTimeStamp;
+    typedef long long int cwASIOSamples;
 #endif
 
 #define IEEE754_64FLOAT 1
-typedef double ASIOSampleRate;
+typedef double cwASIOSampleRate;
 
-typedef long ASIOBool;
-enum cwASIOBool {
+typedef long cwASIOBool;
+enum cwASIObool {
     ASIOFalse = 0,
     ASIOTrue = 1
 };
 
-typedef long ASIOError;
+typedef long cwASIOError;
 enum cwASIOerror {
     ASE_OK = 0,                 //!< This value will be returned whenever the call succeeded
     ASE_SUCCESS = 0x3f4847a0,   //!< unique success return value for ASIOFuture calls
@@ -47,8 +47,8 @@ enum cwASIOerror {
     ASE_NoMemory                //!< not enough memory for completing the request
 };
 
-typedef long ASIOSampleType;
-enum cwASIOSampleType {
+typedef long cwASIOSampleType;
+enum cwASIOsampleType {
     ASIOSTInt16MSB = 0,
     ASIOSTInt24MSB = 1,         //!< used for 20 bits as well
     ASIOSTInt32MSB = 2,
@@ -83,47 +83,47 @@ enum cwASIOSampleType {
     ASIOSTLastEntry
 };
 
-typedef struct cwASIODriverInfo {
+struct cwASIODriverInfo {
     long asioVersion;           //!< currently, 2
     long driverVersion;         //!< driver specific
     char name[32];
     char errorMessage[124];
     void *sysRef;               //!< on input: system reference (on Linux: context pointer)
-} ASIODriverInfo;
+};
 
-typedef struct cwASIOClockSource {
+struct cwASIOClockSource {
     long index;                 //!< as used for setClockSource()
     long associatedChannel;     //!< for instance, S/P-DIF or AES/EBU
     long associatedGroup;       //!< see channel groups (getChannelInfo())
     long isCurrentSource;       //!< bool; true if this is the current clock source
     char name[32];              //!< for user selection
-} ASIOClockSource;
+};
 
-typedef struct cwASIOChannelInfo {
+struct cwASIOChannelInfo {
     long channel;               //!< on input, channel index
-    ASIOBool isInput;           //!< on input
-    ASIOBool isActive;          //!< on exit
+    cwASIOBool isInput;         //!< on input
+    cwASIOBool isActive;        //!< on exit
     long channelGroup;          //!< dto
-    ASIOSampleType type;        //!< dto
+    cwASIOSampleType type;      //!< dto
     char name[32];              //!< dto
-} ASIOChannelInfo;
+};
 
-typedef struct cwASIOBufferInfo {
-    ASIOBool isInput;           //!< on input:  ASIOTrue: input, else output
+struct cwASIOBufferInfo {
+    cwASIOBool isInput;         //!< on input:  ASIOTrue: input, else output
     long channelNum;            //!< on input:  channel index
     void *buffers[2];           //!< on output: double buffer addresses
-} ASIOBufferInfo;
+};
 
-typedef struct cwASIOTimeInfo {
+struct cwASIOTimeInfo {
     double speed;               //!< absolute speed (1. = nominal)
-    ASIOTimeStamp systemTime;   //!< system time related to samplePosition, in nanoseconds on mac, must be derived from Microseconds() (not UpTime()!) on windows, must be derived from timeGetTime()
-    ASIOSamples samplePosition;
-    ASIOSampleRate sampleRate;  //!< current rate
+    cwASIOTimeStamp systemTime; //!< system time related to samplePosition, in nanoseconds on mac, must be derived from Microseconds() (not UpTime()!) on windows, must be derived from timeGetTime()
+    cwASIOSamples samplePosition;
+    cwASIOSampleRate sampleRate;//!< current rate
     unsigned long flags;        //!< (see below)
     char reserved[12];
-} AsioTimeInfo;
+};
 
-typedef enum cwASIOTimeInfoFlags {
+enum cwASIOTimeInfoFlags {
     kSystemTimeValid = 1,           //!< must always be valid
     kSamplePositionValid = 1 << 1,  //!< must always be valid
     kSampleRateValid = 1 << 2,
@@ -131,16 +131,16 @@ typedef enum cwASIOTimeInfoFlags {
 
     kSampleRateChanged = 1 << 4,
     kClockSourceChanged = 1 << 5
-} AsioTimeInfoFlags;
+};
 
-typedef struct cwASIOTimeCode {
-    double speed;               //!< speed relation (fraction of nominal speed) optional; set to 0. or 1. if not supported
-    ASIOSamples timeCodeSamples;//!< time in samples
-    unsigned long flags;        //!< some information flags (see below)
+struct cwASIOTimeCode {
+    double speed;                   //!< speed relation (fraction of nominal speed) optional; set to 0. or 1. if not supported
+    cwASIOSamples timeCodeSamples;  //!< time in samples
+    unsigned long flags;            //!< some information flags (see below)
     char future[64];
-} ASIOTimeCode;
+};
 
-typedef enum cwASIOTimeCodeFlags {
+enum cwASIOTimeCodeFlags {
     kTcValid = 1,
     kTcRunning = 1 << 1,
     kTcReverse = 1 << 2,
@@ -148,15 +148,15 @@ typedef enum cwASIOTimeCodeFlags {
     kTcStill = 1 << 4,
 
     kTcSpeedValid = 1 << 8
-} ASIOTimeCodeFlags;
+};
 
-typedef struct cwASIOTime {     //!< both input/output
-    long reserved[4];           //!< must be 0
-    AsioTimeInfo timeInfo;      //!< required
-    ASIOTimeCode timeCode;      //!< optional, evaluated if (timeCode.flags & kTcValid)
-} ASIOTime;
+struct cwASIOTime {     //!< both input/output
+    long reserved[4];               //!< must be 0
+    struct cwASIOTimeInfo timeInfo; //!< required
+    struct cwASIOTimeCode timeCode; //!< optional, evaluated if (timeCode.flags & kTcValid)
+};
 
-typedef struct cwASIOCallbacks {
+struct cwASIOCallbacks {
     /** bufferSwitch indicates that both input and output are to be processed.
      * @param doubleBufferIndex the current buffer half index (0 for A, 1 for B).
      * It determines
@@ -175,14 +175,14 @@ typedef struct cwASIOCallbacks {
      * 
      * Note: bufferSwitch may be called at interrupt time for highest efficiency.
      */
-    void (*bufferSwitch) (long doubleBufferIndex, ASIOBool directProcess);
+    void (*bufferSwitch) (long doubleBufferIndex, cwASIOBool directProcess);
 
     /** gets called when the AudioStreamIO detects a sample rate change.
      * If sample rate is unknown, 0 is passed (for instance, clock loss
      * when externally synchronized).
      * @param sRate new sample rate
      */
-    void (*sampleRateDidChange) (ASIOSampleRate sRate);
+    void (*sampleRateDidChange) (cwASIOSampleRate sRate);
 
     /** generic callback for various purposes, see selectors below.
      * note this is only present if the asio version is 2 or higher
@@ -194,8 +194,8 @@ typedef struct cwASIOCallbacks {
      * obsolete, and allows for timecode sync etc. to be preferred; will be
      * used if the driver calls asioMessage with selector kAsioSupportsTimeInfo.
      */
-    ASIOTime *(*bufferSwitchTimeInfo) (ASIOTime *params, long doubleBufferIndex, ASIOBool directProcess);
-} ASIOCallbacks;
+    struct cwASIOTime *(*bufferSwitchTimeInfo) (struct cwASIOTime *params, long doubleBufferIndex, cwASIOBool directProcess);
+};
 
 //! asioMessage selectors
 enum cwASIOMessageSel {
@@ -268,29 +268,29 @@ enum cwASIOFutureSel {
     kAsioGetInternalBufferSamples = 0x25042012  //!< ASIOInternalBufferInfo * in params. Deliver size of driver internal buffering, return ASE_SUCCESS if supported
 };
 
-typedef struct cwASIOInputMonitor {
+struct cwASIOInputMonitor {
     long input;         //!< this input was set to monitor (or off), -1: all
     long output;        //!< suggested output for monitoring the input (if so)
     long gain;          //!< suggested gain, ranging 0 - 0x7fffffffL (-inf to +12 dB)
-    ASIOBool state;     //!< ASIOTrue => on, ASIOFalse => off
+    cwASIOBool state;   //!< ASIOTrue => on, ASIOFalse => off
     long pan;           //!< suggested pan, 0 => all left, 0x7fffffff => right
-} ASIOInputMonitor;
+};
 
-typedef struct cwASIOChannelControls {
+struct cwASIOChannelControls {
     long channel;       //!< on input, channel index
-    ASIOBool isInput;   //!< on input
+    cwASIOBool isInput; //!< on input
     long gain;          //!< on input,  ranges 0 thru 0x7fffffff
     long meter;         //!< on return, ranges 0 thru 0x7fffffff
     char future[32];
-} ASIOChannelControls;
+};
 
-typedef struct cwASIOTransportParameters {
+struct cwASIOTransportParameters {
     long command;       // see enum below
-    ASIOSamples samplePosition;
+    cwASIOSamples samplePosition;
     long track;
     long trackSwitches[16]; //!< 512 tracks on/off
     char future[64];
-} ASIOTransportParameters;
+};
 
 enum cwASIOtransportCmd {
     kTransStart = 1,
@@ -307,23 +307,23 @@ enum cwASIOtransportCmd {
 };
 
 typedef long int ASIOIoFormatType;
-enum ASIOIoFormatType_e {
+enum cwASIOIoFormatType {
     kASIOFormatInvalid = -1,
     kASIOPCMFormat = 0,
     kASIODSDFormat = 1,
 };
 
-typedef struct cwASIOIoFormat {
+struct cwASIOIoFormat {
     ASIOIoFormatType    FormatType;
     char                future[512 - sizeof(ASIOIoFormatType)];
-} ASIOIoFormat;
+};
 
 /** Extension for drop detection.
  * Note: Refers to buffering that goes beyond the double buffer e.g. used by USB driver designs
  */
-typedef struct cwASIOInternalBufferInfo {
+struct cwASIOInternalBufferInfo {
     long inputSamples;  //!< size of driver's internal input buffering which is included in getLatencies
     long outputSamples; //!< size of driver's internal output buffering which is included in getLatencies
-} ASIOInternalBufferInfo;
+};
 
 /** @}*/
