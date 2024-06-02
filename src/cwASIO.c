@@ -1,5 +1,5 @@
 /** @file       cwASIO.c
- *  @brief      cwASIO API (Unix implementation)
+ *  @brief      cwASIO API
  *  @author     Stefan Heinzmann
  *  @version    1.0
  *  @date       2023-2024
@@ -23,44 +23,15 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+
+struct _GUID {
+    unsigned long  Data1;
+    unsigned short Data2;
+    unsigned short Data3;
+    unsigned char  Data4[8];
+};
+
 #endif
-
-long cwASIOload(char const *path, struct AsioDriver **drv) {
-#ifdef _WIN32
-    IClassFactory *factory = NULL;
-    CLSID id;
-    HRESULT res = CLSIDFromString(path, &id);
-    if (FAILED(res))
-        return res;
-    res = CoGetClassObject(&id, CLSCTX_INPROC_SERVER, NULL, &IID_IClassFactory, &factory);
-    if (FAILED(res))
-        return res;
-    if (!factory || !factory->lpVtbl)
-        return ASE_NotPresent;
-    res = factory->lpVtbl->CreateInstance(factory, NULL, &id, drv);
-    factory->lpVtbl->Release(factory);
-    if (FAILED(res))
-        return res;
-    return 0;
-#else
-    void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
-    if(!lib)
-        return ASE_NotPresent;
-    
-    struct AsioDriver *(*factory)(void) = dlsym(lib, "driverFactory");
-    if (!factory)
-        return ASE_NotPresent;
-
-    *drv = factory();
-
-    return *drv ? ASE_OK : ASE_NotPresent;
-#endif
-}
-
-void cwASIOunload(struct AsioDriver *drv) {
-    if(drv)
-        drv->vtbl->Release(drv);
-}
 
 #ifdef _WIN32
 static char *toUTF8(wchar_t const *wstr) {
@@ -77,6 +48,64 @@ static char *toUTF8(wchar_t const *wstr) {
     return NULL;
 };
 
+static wchar_t *fromUTF8(char const *str) {
+    if (str) {
+        int len = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
+        if (len > 0) {
+            wchar_t *buf = malloc(len * sizeof(wchar_t));
+            len = MultiByteToWideChar(CP_UTF8, 0, str, -1, buf, len);
+            if (len > 0)
+                return buf;
+            free(buf);
+        }
+    }
+    return NULL;
+};
+
+long cwASIOload(char const *key, struct cwAsioDriver **drv) {
+    wchar_t *path = fromUTF8(key);
+    CLSID id;
+    HRESULT res = CLSIDFromString(path, &id);
+    free(path);
+    path = NULL;
+    if (FAILED(res))
+        return res;
+
+    IClassFactory *factory = NULL;
+    res = CoGetClassObject(&id, CLSCTX_INPROC_SERVER, NULL, &IID_IClassFactory, &factory);
+    if (FAILED(res))
+        return res;
+    if (!factory || !factory->lpVtbl)
+        return ASE_NotPresent;
+
+    res = factory->lpVtbl->CreateInstance(factory, NULL, &id, drv);
+    factory->lpVtbl->Release(factory);
+    if (FAILED(res))
+        return res;
+    return 0;
+}
+#else
+long cwASIOload(char const *path, struct AsioDriver **drv) {
+    void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
+    if(!lib)
+        return ASE_NotPresent;
+    
+    struct AsioDriver *(*factory)(void) = dlsym(lib, "driverFactory");
+    if (!factory)
+        return ASE_NotPresent;
+
+    *drv = factory();
+
+    return *drv ? ASE_OK : ASE_NotPresent;
+}
+#endif
+
+void cwASIOunload(struct cwAsioDriver *drv) {
+    if(drv)
+        drv->vtbl->Release(drv);
+}
+
+#ifdef _WIN32
 static LSTATUS getValue(HKEY hkey, wchar_t *subKey, wchar_t *name, wchar_t **val, DWORD *len) {
     LSTATUS err = ERROR_SUCCESS;
     for (;;) {    // try until buffer size is sufficient

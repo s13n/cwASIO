@@ -21,15 +21,15 @@
 #endif
 
 struct AsioDriver {
-    IASIO *theAsioDriver_;
+    cwAsioDriver *theAsioDriver_;
     unsigned initCounter_;
 
     AsioDriver() : theAsioDriver_(nullptr), initCounter_(0) {}
-    AsioDriver(IASIO *theAsioDriver) : theAsioDriver_(theAsioDriver), initCounter_(0) {}
-    IASIO *get() {
+    AsioDriver(cwAsioDriver *theAsioDriver) : theAsioDriver_(theAsioDriver), initCounter_(0) {}
+    cwAsioDriver *get() {
         return theAsioDriver_;
     }
-    IASIO *operator=(IASIO *theAsioDriver) {
+    cwAsioDriver *operator=(cwAsioDriver *theAsioDriver) {
         theAsioDriver_ = theAsioDriver;
         if (!theAsioDriver_)
             initCounter_ = 0;
@@ -264,7 +264,7 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
     return ERROR_SUCCESS;
 }
 
-IASIO *cwASIOload(char const *key, HRESULT &res) {
+cwAsioDriver *cwASIOload(char const *key, HRESULT &res) {
     CLSID id;
     USES_CONVERSION;
     if (auto clsid = A2COLE(key))
@@ -281,12 +281,12 @@ IASIO *cwASIOload(char const *key, HRESULT &res) {
     res = factory->CreateInstance(NULL, id, &instance);
     if (FAILED(res) || !instance)
         return nullptr;
-    return static_cast<IASIO*>(instance);
+    return static_cast<cwAsioDriver *>(instance);
 }
 
-void cwASIOunload(IASIO *ifc) {
-    if (ifc)
-        ifc->Release();
+void cwASIOunload(cwAsioDriver *drv) {
+    if (drv)
+        drv->Release();
 }
 
 /** @}*/

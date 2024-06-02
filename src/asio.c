@@ -13,7 +13,7 @@
 #include <stdlib.h>
 
 
-static struct AsioDriver *theAsioDriver = NULL;
+static struct cwAsioDriver *theAsioDriver = NULL;
 
 ASIOError ASIOLoad(char const *path) {
     if(theAsioDriver)

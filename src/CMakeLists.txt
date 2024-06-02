@@ -53,37 +53,27 @@ if(WIN32)
         set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DCWASIO_USE_WTL4MINGW=1")
         target_include_directories(cwASIO_lib PRIVATE ${wtl4mingw_build_SOURCE_DIR}/src)
     endif()
-
-    target_sources(cwASIO_lib
-    PUBLIC
-        asio.h
-        cwASIO.h
-        cwASIOifc.hpp
-    PRIVATE
-        asio.c
-        cwASIO.c
-        cwASIO.cpp
-    )
     
     set_target_properties(cwASIO_lib PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
         POSITION_INDEPENDENT_CODE ON
-        PUBLIC_HEADER "cwASIO.h;cwASIOifc.hpp"
     )
 else()
-    target_sources(cwASIO_lib
-    PUBLIC
-        asio.h
-        cwASIO.h
-        cwASIOifc.h
-    PRIVATE
-        asio.c
-        cwASIO.c
-    )
-    
-    set_target_properties(cwASIO_lib PROPERTIES PUBLIC_HEADER "cwASIO.h;cwASIOifc.h")
 endif()
 
+target_sources(cwASIO_lib
+PUBLIC
+    asio.h
+    cwASIO.h
+    cwASIOifc.h
+    cwASIOifc.hpp
+PRIVATE
+    asio.c
+    cwASIO.c
+)
+
+set_target_properties(cwASIO_lib PROPERTIES PUBLIC_HEADER "asio.h;cwASIO.h;cwASIOifc.h;cwASIOifc.hpp")
+target_compile_features(cwASIO_lib PRIVATE cxx_std_23)
 target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(GNUInstallDirs)
