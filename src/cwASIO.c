@@ -1,5 +1,5 @@
 /** @file       cwASIO.c
- *  @brief      cwASIO API
+ *  @brief      cwASIO native API
  *  @author     Stefan Heinzmann
  *  @version    1.0
  *  @date       2023-2024
@@ -8,7 +8,7 @@
  *  @{
  */
 
-#include "cwASIOifc.h"
+#include "cwASIO.h"
 
 #ifdef _WIN32
 #include <combaseapi.h>

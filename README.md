@@ -1,6 +1,6 @@
 # cwASIO
 
-The cwASIO SDK ("**c**ompatible **w**ith **ASIO**", pronounced kway-zee-oh) is
+The cwASIO SDK ("**c**ompatible **w**ith **ASIO**", pronounced kwayz-eye-oh) is
 an alternative implementation of an SDK for the ASIO driver API originally
 defined by Steinberg[^1]. The cwASIO SDK is an independent implementation that
 is compatible with the driver API of ASIO, while supporting it on Linux, in
@@ -18,8 +18,18 @@ enumeration of ASIO devices registered in the Windows registry. On Linux, the
 driver interface consists of a set of functions exported by a dynamically loaded
 shared object file, with a functionality that matches that on Windows.
 
-The COM-based interface on Windows requires C++, whereas the Linux interface is
-C-based.
+The cwASIO API is a C interface, but a C++ wrapper is included for C++ projects.
+`C++23` or newer is required for the wrapper, but for older C++ versions it is
+fairly easy to use the C interface.
+
+## Structure of cwASIO
+
+The sources consist of a C header with type definitions, a header with the
+native cwASIO C interface, a header with the C++ wrapper, and an ASIO
+compatibility header to support easy porting of applications based on the
+Steinberg ASIO SDK to cwASIO. Some C source files contain the library code.
+
+Documentation is provided within the source files in doxygen format.
 
 ## Using cwASIO
 
@@ -39,12 +49,12 @@ make them a part of the host application build.
 
 ## Compatible API
 
-The compatible API attempts to mimick the original ASIO API closely, so that
+The compatible API attempts to mimick the original ASIO C API closely, so that
 applications that have been built with the original ASIO SDK can change to
 cwASIO with minimal effort. This applies to the core API, not the OS-specific
 driver enumeration interface. This same API is also available on Linux.
 
-The compatible API is declared in `cwASIO.h`. It holds hidden global state so
+The compatible API is declared in `asio.h`. It holds hidden global state so
 the application can only have one driver loaded at any time, a restriction that
 it shares with the original ASIO SDK.
 
@@ -57,24 +67,30 @@ native API. The most immediate benefit is the possibility of loading and using
 several drivers simultaneously. The native API is specific to cwASIO and is not
 meant to be a drop-in replacement for the original ASIO API.
 
-The native API is similar, but different between Linux and Windows, because on
-Windows it is based on a COM interface, while on Linux it is based on the
-exported functions of a shared object file. The functionality is the same, so it
+The native API is close to identical on Linux and Windows, because on Linux the
+COM interface used on Windows is mimicked. The functionality is the same, so it
 should not be difficult to accommodate either in a portable application.
 
-The Windows native API is declared in `cwASIOifc.hpp`. It is a C++ interface for
-use with a Microsoft Visual Studio toolset (other compilers are untested at
-present, but might work).
+The native API is declared in `cwASIO.h`. It is a C interface that can be
+used in C++ when included inside an `extern "C" { ... }` bracket.
 
-The Linux native API is declared in `cwASIOifc.h`. It is a C interface that can
-be used in C++ when included inside an `extern "C" { ... }` bracket.
+## C++ API
+
+The C++ API is a thin wrapper around the native cwASIO C API, which converts it
+to ordinary C++ objects and uses data types from the C++ standard library. This
+includes error handling compatible with `system_error`, more automatic resource
+management, and more.
+
+This API is declared in `cwASIO.hpp`. Of course, you would omit the
+`extern "C" { ... }` brackets in this case.
 
 ## Enumerating devices
 
-Enumerating must be done with the native API, and is not compatible with ASIO.
-Both native APIs have the same enumerating function, which is therefore
-portable. It consists of a single function `cwASIOenumerate()`, which accepts a
-callback that is called for each driver that was found installed in the system.
+Enumerating must be done with the native API, and is not compatible with the
+ASIO SDK. The native API has a portable enumerating function, which uses an
+enumeration method appropriate for the platform. It consists of a single function
+`cwASIOenumerate()`, which accepts a callback that is called for each driver that
+was found installed in the system.
 
 Enumerating works by scanning through the registration database (The registry on
 Windows, or the `/etc/cwASIO` directory on Linux) and calling the callback once

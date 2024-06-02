@@ -9,7 +9,7 @@
  */
 
 #include "asio.h"
-#include "cwASIOifc.h"
+#include "cwASIO.h"
 #include <stdlib.h>
 
 

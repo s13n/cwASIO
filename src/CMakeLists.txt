@@ -33,14 +33,14 @@ target_sources(cwASIO_lib
 PUBLIC
     asio.h
     cwASIO.h
-    cwASIOifc.h
-    cwASIOifc.hpp
+    cwASIO.hpp
+    cwASIOtypes.h
 PRIVATE
     asio.c
     cwASIO.c
 )
 
-set_target_properties(cwASIO_lib PROPERTIES PUBLIC_HEADER "asio.h;cwASIO.h;cwASIOifc.h;cwASIOifc.hpp")
+set_target_properties(cwASIO_lib PROPERTIES PUBLIC_HEADER "asio.h;cwASIOtypes.h;cwASIO.h;cwASIO.hpp")
 target_compile_features(cwASIO_lib PUBLIC cxx_std_23)
 target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 

@@ -9,7 +9,7 @@
  */
 #pragma once
 
-#include "cwASIO.h"
+#include "cwASIOtypes.h"
 
 typedef cwASIOTimeStamp ASIOTimeStamp;
 typedef cwASIOSamples ASIOSamples;
