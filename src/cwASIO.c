@@ -85,12 +85,12 @@ long cwASIOload(char const *key, struct cwAsioDriver **drv) {
     return 0;
 }
 #else
-long cwASIOload(char const *path, struct AsioDriver **drv) {
+long cwASIOload(char const *path, struct cwAsioDriver **drv) {
     void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
         return ASE_NotPresent;
     
-    struct AsioDriver *(*factory)(void) = dlsym(lib, "driverFactory");
+    struct cwAsioDriver *(*factory)(void) = dlsym(lib, "driverFactory");
     if (!factory)
         return ASE_NotPresent;
 
