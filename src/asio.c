@@ -25,6 +25,7 @@ ASIOError ASIOUnload(void) {
     if (!theAsioDriver || !theAsioDriver->vtbl)
         return ASE_InvalidParameter;
     cwASIOunload(theAsioDriver);
+    theAsioDriver = NULL;
     return ASE_OK;
 }
 
