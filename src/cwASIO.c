@@ -101,7 +101,7 @@ void cwASIOunload(struct cwAsioDriver *drv) {
 static LSTATUS getValue(HKEY hkey, wchar_t *subKey, wchar_t *name, wchar_t **val, DWORD *len) {
     LSTATUS err = ERROR_SUCCESS;
     for (;;) {    // try until buffer size is sufficient
-        err = RegGetValueW(hkey, subKey, L"CLSID", RRF_RT_REG_SZ, NULL, *val, len);
+        err = RegGetValueW(hkey, subKey, name, RRF_RT_REG_SZ, NULL, *val, len);
         if (err != ERROR_MORE_DATA)
             break;
         wchar_t *tmp = *val;
