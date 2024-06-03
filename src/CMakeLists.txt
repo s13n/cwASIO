@@ -40,7 +40,7 @@ PRIVATE
     cwASIO.c
 )
 
-set_target_properties(cwASIO_lib PROPERTIES PUBLIC_HEADER "asio.h;cwASIOtypes.h;cwASIO.h;cwASIO.hpp")
+set_property(TARGET cwASIO_lib PROPERTY PUBLIC_HEADER asio.h cwASIOtypes.h cwASIO.h cwASIO.hpp)
 target_compile_features(cwASIO_lib PUBLIC cxx_std_23)
 target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
