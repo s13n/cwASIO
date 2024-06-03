@@ -55,7 +55,7 @@ static wchar_t *fromUTF8(char const *str) {
     return NULL;
 };
 
-long cwASIOload(char const *key, struct cwAsioDriver **drv) {
+long cwASIOload(char const *key, struct cwASIODriver **drv) {
     wchar_t *path = fromUTF8(key);
     CLSID id;
     HRESULT res = CLSIDFromString(path, &id);
@@ -144,12 +144,12 @@ close_hkey:
 
 #else
 
-long cwASIOload(char const *path, struct cwAsioDriver **drv) {
+long cwASIOload(char const *path, struct cwASIODriver **drv) {
     void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
         return ASE_NotPresent;
     
-    struct cwAsioDriver *(*factory)(void) = dlsym(lib, "driverFactory");
+    struct cwASIODriver *(*factory)(void) = dlsym(lib, "driverFactory");
     if (!factory)
         return ASE_NotPresent;
 
@@ -235,7 +235,7 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
 
 #endif
 
-void cwASIOunload(struct cwAsioDriver *drv) {
+void cwASIOunload(struct cwASIODriver *drv) {
     if(drv)
         drv->vtbl->Release(drv);
 }

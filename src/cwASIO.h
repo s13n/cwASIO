@@ -27,37 +27,37 @@ struct _GUID {
 #endif
 
 typedef struct _GUID cwASIOGUID;
-struct cwAsioDriver;
+struct cwASIODriver;
 
-struct cwASIO_DriverVtbl {
-    long (CWASIO_METHOD *QueryInterface)(struct cwAsioDriver *, cwASIOGUID const *, void **);
-    unsigned long (CWASIO_METHOD *AddRef)(struct cwAsioDriver *);
-    unsigned long (CWASIO_METHOD *Release)(struct cwAsioDriver *);
-    cwASIOBool (CWASIO_METHOD *init)(struct cwAsioDriver *, void *);
-    void (CWASIO_METHOD *getDriverName)(struct cwAsioDriver *, char *);
-    long (CWASIO_METHOD *getDriverVersion)(struct cwAsioDriver *);
-    void (CWASIO_METHOD *getErrorMessage)(struct cwAsioDriver *, char *);
-    cwASIOError (CWASIO_METHOD *start)(struct cwAsioDriver *);
-    cwASIOError (CWASIO_METHOD *stop)(struct cwAsioDriver *);
-    cwASIOError (CWASIO_METHOD *getChannels)(struct cwAsioDriver *, long *, long *);
-    cwASIOError (CWASIO_METHOD *getLatencies)(struct cwAsioDriver *, long *, long *);
-    cwASIOError (CWASIO_METHOD *getBufferSize)(struct cwAsioDriver *, long *, long *, long *, long *);
-    cwASIOError (CWASIO_METHOD *canSampleRate)(struct cwAsioDriver *, double);
-    cwASIOError (CWASIO_METHOD *getSampleRate)(struct cwAsioDriver *, double *);
-    cwASIOError (CWASIO_METHOD *setSampleRate)(struct cwAsioDriver *, double);
-    cwASIOError (CWASIO_METHOD *getClockSources)(struct cwAsioDriver *, struct cwASIOClockSource *, long *);
-    cwASIOError (CWASIO_METHOD *setClockSource)(struct cwAsioDriver *, long);
-    cwASIOError (CWASIO_METHOD *getSamplePosition)(struct cwAsioDriver *, cwASIOSamples *, cwASIOTimeStamp *);
-    cwASIOError (CWASIO_METHOD *getChannelInfo)(struct cwAsioDriver *, struct cwASIOChannelInfo *);
-    cwASIOError (CWASIO_METHOD *createBuffers)(struct cwAsioDriver *, struct cwASIOBufferInfo *, long , long , struct cwASIOCallbacks const *);
-    cwASIOError (CWASIO_METHOD *disposeBuffers)(struct cwAsioDriver *);
-    cwASIOError (CWASIO_METHOD *controlPanel)(struct cwAsioDriver *);
-    cwASIOError (CWASIO_METHOD *future)(struct cwAsioDriver *, long, void *);
-    cwASIOError (CWASIO_METHOD *outputReady)(struct cwAsioDriver *);
+struct cwASIODriverVtbl {
+    long (CWASIO_METHOD *QueryInterface)(struct cwASIODriver *, cwASIOGUID const *, void **);
+    unsigned long (CWASIO_METHOD *AddRef)(struct cwASIODriver *);
+    unsigned long (CWASIO_METHOD *Release)(struct cwASIODriver *);
+    cwASIOBool (CWASIO_METHOD *init)(struct cwASIODriver *, void *);
+    void (CWASIO_METHOD *getDriverName)(struct cwASIODriver *, char *);
+    long (CWASIO_METHOD *getDriverVersion)(struct cwASIODriver *);
+    void (CWASIO_METHOD *getErrorMessage)(struct cwASIODriver *, char *);
+    cwASIOError (CWASIO_METHOD *start)(struct cwASIODriver *);
+    cwASIOError (CWASIO_METHOD *stop)(struct cwASIODriver *);
+    cwASIOError (CWASIO_METHOD *getChannels)(struct cwASIODriver *, long *, long *);
+    cwASIOError (CWASIO_METHOD *getLatencies)(struct cwASIODriver *, long *, long *);
+    cwASIOError (CWASIO_METHOD *getBufferSize)(struct cwASIODriver *, long *, long *, long *, long *);
+    cwASIOError (CWASIO_METHOD *canSampleRate)(struct cwASIODriver *, double);
+    cwASIOError (CWASIO_METHOD *getSampleRate)(struct cwASIODriver *, double *);
+    cwASIOError (CWASIO_METHOD *setSampleRate)(struct cwASIODriver *, double);
+    cwASIOError (CWASIO_METHOD *getClockSources)(struct cwASIODriver *, struct cwASIOClockSource *, long *);
+    cwASIOError (CWASIO_METHOD *setClockSource)(struct cwASIODriver *, long);
+    cwASIOError (CWASIO_METHOD *getSamplePosition)(struct cwASIODriver *, cwASIOSamples *, cwASIOTimeStamp *);
+    cwASIOError (CWASIO_METHOD *getChannelInfo)(struct cwASIODriver *, struct cwASIOChannelInfo *);
+    cwASIOError (CWASIO_METHOD *createBuffers)(struct cwASIODriver *, struct cwASIOBufferInfo *, long , long , struct cwASIOCallbacks const *);
+    cwASIOError (CWASIO_METHOD *disposeBuffers)(struct cwASIODriver *);
+    cwASIOError (CWASIO_METHOD *controlPanel)(struct cwASIODriver *);
+    cwASIOError (CWASIO_METHOD *future)(struct cwASIODriver *, long, void *);
+    cwASIOError (CWASIO_METHOD *outputReady)(struct cwASIODriver *);
 };
 
-struct cwAsioDriver {
-    struct cwASIO_DriverVtbl const *vtbl;
+struct cwASIODriver {
+    struct cwASIODriverVtbl const *vtbl;
 };
 
 typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
@@ -80,11 +80,11 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context);
  * @param drv Receives a pointer to the driver instance.
  * @return an error code when unsuccessful, zero on success.
  */
-long cwASIOload(char const *key, struct cwAsioDriver **drv);
+long cwASIOload(char const *key, struct cwASIODriver **drv);
 
 /** Unload the driver.
  * @param drv Pointer to the driver instance that was initialized by cwASIOload()
  */
-void cwASIOunload(struct cwAsioDriver *drv);
+void cwASIOunload(struct cwASIODriver *drv);
 
 /** @}*/
