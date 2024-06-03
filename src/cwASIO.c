@@ -9,23 +9,24 @@
  */
 
 #include "cwASIO.h"
-
-#ifdef _WIN32
-#include <combaseapi.h>
-#include <unknwnbase.h>
-#else
-#include <alloca.h>
-#include <dirent.h>
-#include <dlfcn.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#ifdef _WIN32
+#   include <combaseapi.h>
+#   include <unknwnbase.h>
+#   include <winreg.h>
+#else
+#   include <alloca.h>
+#   include <dirent.h>
+#   include <dlfcn.h>
+#   include <errno.h>
+#   include <fcntl.h>
+#   include <string.h>
+#   include <unistd.h>
+#   include <sys/stat.h>
 #endif
 
 #ifdef _WIN32
+
 static char *toUTF8(wchar_t const *wstr) {
     if (wstr) {
         int len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
@@ -76,28 +77,7 @@ long cwASIOload(char const *key, struct cwAsioDriver **drv) {
         return res;
     return 0;
 }
-#else
-long cwASIOload(char const *path, struct cwAsioDriver **drv) {
-    void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
-    if(!lib)
-        return ASE_NotPresent;
-    
-    struct cwAsioDriver *(*factory)(void) = dlsym(lib, "driverFactory");
-    if (!factory)
-        return ASE_NotPresent;
 
-    *drv = factory();
-
-    return *drv ? ASE_OK : ASE_NotPresent;
-}
-#endif
-
-void cwASIOunload(struct cwAsioDriver *drv) {
-    if(drv)
-        drv->vtbl->Release(drv);
-}
-
-#ifdef _WIN32
 static LSTATUS getValue(HKEY hkey, wchar_t *subKey, wchar_t *name, wchar_t **val, DWORD *len) {
     LSTATUS err = ERROR_SUCCESS;
     for (;;) {    // try until buffer size is sufficient
@@ -125,7 +105,7 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
     if (err != ERROR_SUCCESS)
         goto close_hkey;
 
-    wchar_t *subKey = malloc(sizeof(wchar_t) * (subkeyLen+1));
+    wchar_t *subKey = malloc(sizeof(wchar_t) * (subkeyLen + 1));
     DWORD clsidLen = 40;
     wchar_t *clsid = malloc(sizeof(wchar_t) * clsidLen);
     DWORD descriptionLen = 16;
@@ -161,42 +141,59 @@ close_hkey:
     RegCloseKey(hkey);
     return err;
 }
+
 #else
+
+long cwASIOload(char const *path, struct cwAsioDriver **drv) {
+    void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
+    if(!lib)
+        return ASE_NotPresent;
+    
+    struct cwAsioDriver *(*factory)(void) = dlsym(lib, "driverFactory");
+    if (!factory)
+        return ASE_NotPresent;
+
+    *drv = factory();
+
+    return *drv ? ASE_OK : ASE_NotPresent;
+}
+
 static char *cwASIOreadConfig(char const *base, char const *name, char const *file) {
     size_t baseLen = strlen(base);
     size_t nameLen = strlen(name);
-    char *path = (char*)alloca(baseLen + 1 + nameLen + strlen(file) + 1);
+    char *path = (char *)alloca(baseLen + 1 + nameLen + strlen(file) + 1);
     strcpy(path, base);
     path[baseLen] = '/';
     strcpy(path + baseLen + 1, name);
     strcpy(path + baseLen + 1 + nameLen, file);
 
     int fd = open(path, O_RDONLY);
-    if(fd < 0)
+    if (fd < 0)
         return NULL;
 
     struct stat st;
-    if(fstat(fd, &st) < 0) {
+    if (fstat(fd, &st) < 0) {
         int err = errno;
         close(fd);
         errno = err;
         return NULL;
     }
 
-    if(st.st_size > 1023)
+    if (st.st_size > 1023)
         st.st_size = 1023;  // limit buffer size
-    char *txt = (char*)malloc(st.st_size + 1);
+    char *txt = (char *)malloc(st.st_size + 1);
     ssize_t len = read(fd, txt, st.st_size);
     int err = errno;
     close(fd);
-    if(len < 0) {
+    if (len < 0) {
         free(txt);
         errno = err;
         return NULL;
-    } else {
+    }
+    else {
         txt[len] = '\0';
         char *end = strchr(txt, '\n');
-        if(end)
+        if (end)
             *end = '\0';    // terminate at end of first line
         errno = err;
         return txt;
@@ -209,30 +206,38 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
     struct dirent *rent;
     DIR *base = opendir(path);
 
-    if(!base)
+    if (!base)
         return errno;
 
     do {
         errno = 0;
         rent = readdir(base);
-        if(!rent) {
+        if (!rent) {
             res = errno;
             break;
-        } else if(rent->d_name[0] == '.') {
+        }
+        else if (rent->d_name[0] == '.') {
             continue;   // ignore entries starting with a dot
-        } else {
+        }
+        else {
             char *driver = cwASIOreadConfig(path, rent->d_name, "/driver");
             char *description = cwASIOreadConfig(path, rent->d_name, "/description");
-            if(!cb(context, rent->d_name, driver, description))
+            if (!cb(context, rent->d_name, driver, description))
                 rent = NULL;
             free(driver);
             free(description);
         }
-    } while(rent);
+    } while (rent);
 
     closedir(base);
     return res;
 }
+
 #endif
+
+void cwASIOunload(struct cwAsioDriver *drv) {
+    if(drv)
+        drv->vtbl->Release(drv);
+}
 
 /** @}*/

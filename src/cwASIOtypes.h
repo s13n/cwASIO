@@ -37,9 +37,9 @@ enum cwASIObool {
 typedef long cwASIOError;
 enum cwASIOerror {
     ASE_OK = 0,                 //!< This value will be returned whenever the call succeeded
-    ASE_SUCCESS = 0x3f4847a0,   //!< unique success return value for ASIOFuture calls
+    ASE_SUCCESS = 0x3f4847a0,   //!< unique success return value for `future()` calls
     ASE_NotPresent = -1000,     //!< hardware input or output is not present or available
-    ASE_HWMalfunction,          //!< hardware is malfunctioning (can be returned by any ASIO function)
+    ASE_HWMalfunction,          //!< hardware is malfunctioning (can be returned by any cwASIO function)
     ASE_InvalidParameter,       //!< input parameter invalid
     ASE_InvalidMode,            //!< hardware is in a bad mode or used in a bad mode
     ASE_SPNotAdvancing,         //!< hardware is not running when sample position is inquired
@@ -78,7 +78,7 @@ enum cwASIOsampleType {
     // ASIO DSD format.
     ASIOSTDSDInt8LSB1 = 32,     //!< DSD 1 bit data, 8 samples per byte. First sample in Least significant bit.
     ASIOSTDSDInt8MSB1 = 33,     //!< DSD 1 bit data, 8 samples per byte. First sample in Most significant bit.
-    ASIOSTDSDInt8NER8 = 40,     //!< DSD 8 bit data, 1 sample per byte. No Endianness required.
+    ASIOSTDSDInt8NER8 = 40,     //!< DSD 8 bit data, 1 sample per byte. No endianness required.
 
     ASIOSTLastEntry
 };
@@ -92,9 +92,9 @@ struct cwASIODriverInfo {
 };
 
 struct cwASIOClockSource {
-    long index;                 //!< as used for setClockSource()
+    long index;                 //!< as used for `setClockSource()`
     long associatedChannel;     //!< for instance, S/P-DIF or AES/EBU
-    long associatedGroup;       //!< see channel groups (getChannelInfo())
+    long associatedGroup;       //!< see channel groups (`getChannelInfo()`)
     long isCurrentSource;       //!< bool; true if this is the current clock source
     char name[32];              //!< for user selection
 };
@@ -109,14 +109,14 @@ struct cwASIOChannelInfo {
 };
 
 struct cwASIOBufferInfo {
-    cwASIOBool isInput;         //!< on input:  ASIOTrue: input, else output
+    cwASIOBool isInput;         //!< on input:  cwASIOTrue: input, else output
     long channelNum;            //!< on input:  channel index
     void *buffers[2];           //!< on output: double buffer addresses
 };
 
 struct cwASIOTimeInfo {
     double speed;               //!< absolute speed (1. = nominal)
-    cwASIOTimeStamp systemTime; //!< system time related to samplePosition, in nanoseconds on mac, must be derived from Microseconds() (not UpTime()!) on windows, must be derived from timeGetTime()
+    cwASIOTimeStamp systemTime; //!< system time related to samplePosition, in nanoseconds on mac, must be derived from `Microseconds()` (not `UpTime()`!) on windows, must be derived from `timeGetTime()`
     cwASIOSamples samplePosition;
     cwASIOSampleRate sampleRate;//!< current rate
     unsigned long flags;        //!< (see below)
@@ -157,7 +157,7 @@ struct cwASIOTime {     //!< both input/output
 };
 
 struct cwASIOCallbacks {
-    /** bufferSwitch indicates that both input and output are to be processed.
+    /** indicates that both input and output are to be processed.
      * @param doubleBufferIndex the current buffer half index (0 for A, 1 for B).
      * It determines
      * - the output buffer that the host should start to fill. the other buffer
@@ -167,11 +167,11 @@ struct cwASIOCallbacks {
      *   because of the synchronicity of i/o, the input always has at
      *   least one buffer latency in relation to the output.
      * @param directProcess suggests to the host whether it should immediately
-     * start processing (directProcess == ASIOTrue), or whether its process
+     * start processing (`directProcess == cwASIOTrue`), or whether its process
      * should be deferred because the call comes from a very low level
      * (for instance, a high level priority interrupt), and direct processing
      * would cause timing instabilities for the rest of the system. If in doubt,
-     * directProcess should be set to ASIOFalse.
+     * directProcess should be set to cwASIOFalse.
      * 
      * Note: bufferSwitch may be called at interrupt time for highest efficiency.
      */
@@ -184,15 +184,15 @@ struct cwASIOCallbacks {
      */
     void (*sampleRateDidChange) (cwASIOSampleRate sRate);
 
-    /** generic callback for various purposes, see selectors below.
+    /** generic callback for various purposes, see `enum cwASIOMessageSel`.
      * note this is only present if the asio version is 2 or higher
      */
     long (*asioMessage) (long selector, long value, void *message, double *opt);
 
     /** new callback with time info.
-     * makes ASIOGetSamplePosition() and various calls to ASIOGetSampleRate
-     * obsolete, and allows for timecode sync etc. to be preferred; will be
-     * used if the driver calls asioMessage with selector kAsioSupportsTimeInfo.
+     * makes `getSamplePosition()` and various calls to `getSampleRate()` obsolete,
+     * and allows for timecode sync etc. to be preferred; will be used if the driver
+     * calls `asioMessage()` with selector `kAsioSupportsTimeInfo`.
      */
     struct cwASIOTime *(*bufferSwitchTimeInfo) (struct cwASIOTime *params, long doubleBufferIndex, cwASIOBool directProcess);
 };
@@ -203,17 +203,17 @@ enum cwASIOMessageSel {
     kAsioEngineVersion,         //!< returns engine (host) asio implementation version, 2 or higher
 
     /** request driver reset.
-     * if accepted, this will close the driver (ASIO_Exit() ) and re-open it again (ASIO_Init() etc).
+     * if accepted, this will close the driver (`ASIOExit()`) and re-open it again (`init()` etc).
      * some drivers need to reconfigure for instance when the sample rate changes, or some basic
-     * changes have been made in ASIO_ControlPanel(). returns 1L; note the request is merely passed
+     * changes have been made in `controlPanel()`. returns 1L; note the request is merely passed
      * to the application, there is no way to determine if it gets accepted at this time (but it
      * usually will be).
      */
     kAsioResetRequest,
 
     /** not yet supported, will currently always return 0L.
-     * for now, use kAsioResetRequest instead. once implemented, the new buffer size is expected
-     * in <value>, and on success returns 1L
+     * for now, use `kAsioResetRequest` instead.
+     * once implemented, the new buffer size is expected in <value>, and on success returns 1L
      */
     kAsioBufferSizeChange,
 
@@ -224,10 +224,10 @@ enum cwASIOMessageSel {
     kAsioResyncRequest,
 
     kAsioLatenciesChanged,      //!< the drivers latencies have changed. The engine will refetch the latencies.
-    kAsioSupportsTimeInfo,      //!< if host returns true here, it will expect the callback bufferSwitchTimeInfo to be called instead of bufferSwitch
+    kAsioSupportsTimeInfo,      //!< if host returns true here, it will expect `bufferSwitchTimeInfo()` to be called instead of `bufferSwitch()`
     kAsioSupportsTimeCode,
     kAsioMMCCommand,            //!< unused - value: number of commands, message points to mmc commands
-    kAsioSupportsInputMonitor,  //!< kAsioSupportsXXX return 1 if host supports this
+    kAsioSupportsInputMonitor,  //!< `kAsioSupportsXXX` return 1 if host supports this
     kAsioSupportsInputGain,     //!< unused and undefined
     kAsioSupportsInputMeter,    //!< unused and undefined
     kAsioSupportsOutputGain,    //!< unused and undefined
@@ -240,12 +240,12 @@ enum cwASIOMessageSel {
 enum cwASIOFutureSel {
     kAsioEnableTimeCodeRead = 1,    //!< no arguments
     kAsioDisableTimeCodeRead,       //!< no arguments
-    kAsioSetInputMonitor,           //!< ASIOInputMonitor* in params
-    kAsioTransport,                 //!< ASIOTransportParameters* in params
-    kAsioSetInputGain,              //!< ASIOChannelControls* in params, apply gain
-    kAsioGetInputMeter,             //!< ASIOChannelControls* in params, fill meter
-    kAsioSetOutputGain,             //!< ASIOChannelControls* in params, apply gain
-    kAsioGetOutputMeter,            //!< ASIOChannelControls* in params, fill meter
+    kAsioSetInputMonitor,           //!< cwASIOInputMonitor* in params
+    kAsioTransport,                 //!< cwASIOTransportParameters* in params
+    kAsioSetInputGain,              //!< cwASIOChannelControls* in params, apply gain
+    kAsioGetInputMeter,             //!< cwASIOChannelControls* in params, fill meter
+    kAsioSetOutputGain,             //!< cwASIOChannelControls* in params, apply gain
+    kAsioGetOutputMeter,            //!< cwASIOChannelControls* in params, fill meter
     kAsioCanInputMonitor,           //!< no arguments
     kAsioCanTimeInfo,               //!< no arguments
     kAsioCanTimeCode,               //!< no arguments
@@ -258,21 +258,21 @@ enum cwASIOFutureSel {
 
     // DSD support
     // The following extensions are required to allow switching and control of the DSD subsystem.
-    kAsioSetIoFormat = 0x23111961,      //!< ASIOIoFormat * in params.
-    kAsioGetIoFormat = 0x23111983,      //!< ASIOIoFormat * in params.
-    kAsioCanDoIoFormat = 0x23112004,    //!< ASIOIoFormat * in params.
+    kAsioSetIoFormat = 0x23111961,      //!< cwASIOIoFormat * in params.
+    kAsioGetIoFormat = 0x23111983,      //!< cwASIOIoFormat * in params.
+    kAsioCanDoIoFormat = 0x23112004,    //!< cwASIOIoFormat * in params.
 
     // Extension for drop out detection
-    kAsioCanReportOverload = 0x24042012,    //!< return ASE_SUCCESS if driver can detect and report overloads
+    kAsioCanReportOverload = 0x24042012,    //!< return `ASE_SUCCESS` if driver can detect and report overloads
 
-    kAsioGetInternalBufferSamples = 0x25042012  //!< ASIOInternalBufferInfo * in params. Deliver size of driver internal buffering, return ASE_SUCCESS if supported
+    kAsioGetInternalBufferSamples = 0x25042012  //!< cwASIOInternalBufferInfo * in params. Deliver size of driver internal buffering, return `ASE_SUCCESS` if supported
 };
 
 struct cwASIOInputMonitor {
     long input;         //!< this input was set to monitor (or off), -1: all
     long output;        //!< suggested output for monitoring the input (if so)
     long gain;          //!< suggested gain, ranging 0 - 0x7fffffffL (-inf to +12 dB)
-    cwASIOBool state;   //!< ASIOTrue => on, ASIOFalse => off
+    cwASIOBool state;   //!< cwASIOTrue => on, cwASIOFalse => off
     long pan;           //!< suggested pan, 0 => all left, 0x7fffffff => right
 };
 

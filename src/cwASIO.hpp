@@ -77,7 +77,7 @@ namespace cwASIO {
             : drv_{ nullptr }
         {
             auto err = cwASIOload(id.c_str(), &drv_);
-            if (err)
+            if (err || !drv_ || !drv_->vtbl)
                 throw std::runtime_error("can't load cwASIO driver " + id + " err=" + std::to_string(err));
         }
 

@@ -11,7 +11,6 @@
 
 #include "cwASIOtypes.h"
 #include <stdbool.h>
-#include <stdint.h>
 
 #ifdef _WIN32
 #   include <guiddef.h>
@@ -64,26 +63,28 @@ struct cwAsioDriver {
 typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
 
 /** Enumerate devices installed on the system.
-* An enumeration function is passed to cwASIOenumerate(), which will get called once for every entry found in the ASIO driver list.
-* If the enumeration function returns with a true result, enumeration continues with the next entry, otherwise enumeration terminates.
-* Three strings are passed to the enumeration function: Name, Path and Description. The latter two might be empty, if the
-* corresponding registry entry is empty or absent. You might want to ignore such entries.
-* @param cb Pointer to callback function
-* @param context Pointer to be forwarded to callback function as its first parameter.
-* @return error code, which is zero on success.
-*/
+ * An enumeration function is passed to `cwASIOenumerate()`, which will get called once
+ * for every entry found in the installed drivers list. If the enumeration function
+ * returns with a true result, enumeration continues with the next entry, otherwise
+ * enumeration terminates. Three strings are passed to the enumeration function:
+ * Name, Path and Description. The latter two might be empty, if the corresponding
+ * drivers list entry is empty or absent. You might want to ignore such entries.
+ * @param cb Pointer to callback function
+ * @param context Pointer to be forwarded to callback function as its first parameter.
+ * @return error code, which is zero on success.
+ */
 int cwASIOenumerate(cwASIOcallback *cb, void *context);
 
-/** Load the ASIO driver.
-* @param id On Windows: the CLSID, on Linux: the file path of the driver to load.
-* @param drv Receives a pointer to the driver instance.
-* @return an error code when unsuccessful, zero on success.
-*/
+/** Load the driver.
+ * @param id On Windows: the CLSID, on Linux: the file path of the driver to load.
+ * @param drv Receives a pointer to the driver instance.
+ * @return an error code when unsuccessful, zero on success.
+ */
 long cwASIOload(char const *key, struct cwAsioDriver **drv);
 
-/** Unload the ASIO driver.
-* @param drv Pointer to the driver instance that was initialized by cwASIOload()
-*/
+/** Unload the driver.
+ * @param drv Pointer to the driver instance that was initialized by cwASIOload()
+ */
 void cwASIOunload(struct cwAsioDriver *drv);
 
 /** @}*/
