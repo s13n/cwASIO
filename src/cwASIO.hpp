@@ -68,7 +68,7 @@ namespace cwASIO {
 
     struct Driver {
     private:
-        struct cwAsioDriver *drv_;
+        struct cwASIODriver *drv_;
 
         Driver(Driver &&) = delete;
 
