@@ -22,7 +22,7 @@ ASIOError ASIOLoad(char const *path) {
 }
 
 ASIOError ASIOUnload(void) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_InvalidParameter;
     cwASIOunload(theAsioDriver);
     theAsioDriver = NULL;
@@ -30,15 +30,15 @@ ASIOError ASIOUnload(void) {
 }
 
 ASIOError ASIOInit(ASIODriverInfo *info) {
-    if(!theAsioDriver || !theAsioDriver->vtbl)
+    if(!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    if (!theAsioDriver->vtbl->init(theAsioDriver, info ? info->sysRef : 0))
+    if (!theAsioDriver->lpVtbl->init(theAsioDriver, info ? info->sysRef : 0))
         return ASE_NotPresent;
     if(info) {
         info->asioVersion = 2;
-        theAsioDriver->vtbl->getDriverName(theAsioDriver, info->name);
-        info->driverVersion = theAsioDriver->vtbl->getDriverVersion(theAsioDriver);
-        theAsioDriver->vtbl->getErrorMessage(theAsioDriver, info->errorMessage);
+        theAsioDriver->lpVtbl->getDriverName(theAsioDriver, info->name);
+        info->driverVersion = theAsioDriver->lpVtbl->getDriverVersion(theAsioDriver);
+        theAsioDriver->lpVtbl->getErrorMessage(theAsioDriver, info->errorMessage);
     }
     return ASE_OK;
 }
@@ -48,105 +48,105 @@ ASIOError ASIOExit(void) {
 }
 
 ASIOError ASIOStart(void) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->start(theAsioDriver);
+    return theAsioDriver->lpVtbl->start(theAsioDriver);
 }
 
 ASIOError ASIOStop(void) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->stop(theAsioDriver);
+    return theAsioDriver->lpVtbl->stop(theAsioDriver);
 }
 
 ASIOError ASIOGetChannels(long *numInputChannels, long *numOutputChannels) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->getChannels(theAsioDriver, numInputChannels, numOutputChannels);
+    return theAsioDriver->lpVtbl->getChannels(theAsioDriver, numInputChannels, numOutputChannels);
 }
 
 ASIOError ASIOGetLatencies(long *inputLatency, long *outputLatency) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->getLatencies(theAsioDriver, inputLatency, outputLatency);
+    return theAsioDriver->lpVtbl->getLatencies(theAsioDriver, inputLatency, outputLatency);
 }
 
 ASIOError ASIOGetBufferSize(long *minSize, long *maxSize, long *preferredSize, long *granularity) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->getBufferSize(theAsioDriver, minSize, maxSize, preferredSize, granularity);
+    return theAsioDriver->lpVtbl->getBufferSize(theAsioDriver, minSize, maxSize, preferredSize, granularity);
 }
 
 ASIOError ASIOCanSampleRate(ASIOSampleRate sampleRate) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->canSampleRate(theAsioDriver, sampleRate);
+    return theAsioDriver->lpVtbl->canSampleRate(theAsioDriver, sampleRate);
 }
 
 ASIOError ASIOGetSampleRate(ASIOSampleRate *currentRate) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->getSampleRate(theAsioDriver, currentRate);
+    return theAsioDriver->lpVtbl->getSampleRate(theAsioDriver, currentRate);
 }
 
 ASIOError ASIOSetSampleRate(ASIOSampleRate sampleRate) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->setSampleRate(theAsioDriver, sampleRate);
+    return theAsioDriver->lpVtbl->setSampleRate(theAsioDriver, sampleRate);
 }
 
 ASIOError ASIOGetClockSources(ASIOClockSource *clocks, long *numSources) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->getClockSources(theAsioDriver, clocks, numSources);
+    return theAsioDriver->lpVtbl->getClockSources(theAsioDriver, clocks, numSources);
 }
 
 ASIOError ASIOSetClockSource(long reference) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->setClockSource(theAsioDriver, reference);
+    return theAsioDriver->lpVtbl->setClockSource(theAsioDriver, reference);
 }
 
 ASIOError ASIOGetSamplePosition (ASIOSamples *sPos, ASIOTimeStamp *tStamp) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->getSamplePosition(theAsioDriver, sPos, tStamp);
+    return theAsioDriver->lpVtbl->getSamplePosition(theAsioDriver, sPos, tStamp);
 }
 
 ASIOError ASIOGetChannelInfo(ASIOChannelInfo *info) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->getChannelInfo(theAsioDriver, info);
+    return theAsioDriver->lpVtbl->getChannelInfo(theAsioDriver, info);
 }
 
 ASIOError ASIOCreateBuffers(ASIOBufferInfo *bufferInfos, long numChannels, long bufferSize, ASIOCallbacks const *callbacks) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->createBuffers(theAsioDriver, bufferInfos, numChannels, bufferSize, callbacks);
+    return theAsioDriver->lpVtbl->createBuffers(theAsioDriver, bufferInfos, numChannels, bufferSize, callbacks);
 }
 
 ASIOError ASIODisposeBuffers(void) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->disposeBuffers(theAsioDriver);
+    return theAsioDriver->lpVtbl->disposeBuffers(theAsioDriver);
 }
 
 ASIOError ASIOControlPanel(void) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->controlPanel(theAsioDriver);
+    return theAsioDriver->lpVtbl->controlPanel(theAsioDriver);
 }
 
 ASIOError ASIOFuture(long selector, void *params) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->future(theAsioDriver, selector, params);
+    return theAsioDriver->lpVtbl->future(theAsioDriver, selector, params);
 }
 
 ASIOError ASIOOutputReady(void) {
-    if (!theAsioDriver || !theAsioDriver->vtbl)
+    if (!theAsioDriver || !theAsioDriver->lpVtbl)
         return ASE_NotPresent;
-    return theAsioDriver->vtbl->outputReady(theAsioDriver);
+    return theAsioDriver->lpVtbl->outputReady(theAsioDriver);
 }
 
 /** @}*/

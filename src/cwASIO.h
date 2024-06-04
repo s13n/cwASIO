@@ -57,7 +57,7 @@ struct cwASIODriverVtbl {
 };
 
 struct cwASIODriver {
-    struct cwASIODriverVtbl const *vtbl;
+    struct cwASIODriverVtbl const *lpVtbl;
 };
 
 typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);

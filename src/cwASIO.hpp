@@ -77,7 +77,7 @@ namespace cwASIO {
             : drv_{ nullptr }
         {
             auto err = cwASIOload(id.c_str(), &drv_);
-            if (err || !drv_ || !drv_->vtbl)
+            if (err || !drv_ || !drv_->lpVtbl)
                 throw std::runtime_error("can't load cwASIO driver " + id + " err=" + std::to_string(err));
         }
 
@@ -88,73 +88,73 @@ namespace cwASIO {
         // The following wrapper functions are supposed to ease debugging. They should get optimized away in a release build.
 
         bool init(void *sysHandle) {
-            return drv_->vtbl->init(drv_, sysHandle);
+            return drv_->lpVtbl->init(drv_, sysHandle);
         }
 
         void getDriverName(char *name) {
-            drv_->vtbl->getDriverName(drv_, name);
+            drv_->lpVtbl->getDriverName(drv_, name);
         }
 
         long getDriverVersion() {
-            return drv_->vtbl->getDriverVersion(drv_);
+            return drv_->lpVtbl->getDriverVersion(drv_);
         }
 
         std::string getErrorMessage() {
             std::string errorMessage(124, '\0');
-            drv_->vtbl->getErrorMessage(drv_, errorMessage.data());
+            drv_->lpVtbl->getErrorMessage(drv_, errorMessage.data());
             errorMessage.resize(std::min(errorMessage.find('\0'), errorMessage.length()));
             return errorMessage;
         }
 
         cwASIOError start() {
-            return drv_->vtbl->start(drv_);
+            return drv_->lpVtbl->start(drv_);
         }
 
         cwASIOError stop() {
-            return drv_->vtbl->stop(drv_);
+            return drv_->lpVtbl->stop(drv_);
         }
 
         std::tuple<cwASIOError, long, long> getChannels() {
             long numInputChannels, numOutputChannels;
-            auto err = drv_->vtbl->getChannels(drv_, &numInputChannels, &numOutputChannels);
+            auto err = drv_->lpVtbl->getChannels(drv_, &numInputChannels, &numOutputChannels);
             return { err, numInputChannels, numOutputChannels };
         }
 
         std::tuple<cwASIOError, long, long> getLatencies() {
             long inputLatency, outputLatency;
-            auto err = drv_->vtbl->getLatencies(drv_, &inputLatency, &outputLatency);
+            auto err = drv_->lpVtbl->getLatencies(drv_, &inputLatency, &outputLatency);
             return { err, inputLatency, outputLatency };
         }
 
         std::tuple<cwASIOError, long, long, long, long> getBufferSize() {
             long minSize, maxSize, preferredSize, granularity;
-            auto err = drv_->vtbl->getBufferSize(drv_, &minSize, &maxSize, &preferredSize, &granularity);
+            auto err = drv_->lpVtbl->getBufferSize(drv_, &minSize, &maxSize, &preferredSize, &granularity);
             return { err, minSize, maxSize, preferredSize, granularity };
         }
 
         cwASIOError canSampleRate(double sampleRate) {
-            return drv_->vtbl->canSampleRate(drv_, sampleRate);
+            return drv_->lpVtbl->canSampleRate(drv_, sampleRate);
         }
 
         std::expected<double, std::error_code> getSampleRate() {
             double sampleRate;
-            auto err = drv_->vtbl->getSampleRate(drv_, &sampleRate);
+            auto err = drv_->lpVtbl->getSampleRate(drv_, &sampleRate);
             if (err)
                 return std::unexpected(std::error_code(err, err_category()));
             return sampleRate;
         }
 
         cwASIOError setSampleRate(double sampleRate) {
-            return drv_->vtbl->setSampleRate(drv_, sampleRate);
+            return drv_->lpVtbl->setSampleRate(drv_, sampleRate);
         }
 
         std::expected<std::vector<cwASIOClockSource>, std::error_code> getClockSources() {
             std::vector<cwASIOClockSource> clocks(1);
             long numSources = long(clocks.size());
-            auto err = drv_->vtbl->getClockSources(drv_, clocks.data(), &numSources);
+            auto err = drv_->lpVtbl->getClockSources(drv_, clocks.data(), &numSources);
             if (size_t(numSources) > clocks.size()) {
                 clocks.resize(numSources);
-                err = drv_->vtbl->getClockSources(drv_, clocks.data(), &numSources);
+                err = drv_->lpVtbl->getClockSources(drv_, clocks.data(), &numSources);
             }
             if (err)
                 return std::unexpected(std::error_code(err, err_category()));
@@ -162,39 +162,39 @@ namespace cwASIO {
         }
 
         cwASIOError setClockSource(long reference) {
-            return drv_->vtbl->setClockSource(drv_, reference);
+            return drv_->lpVtbl->setClockSource(drv_, reference);
         }
 
         std::expected<SamplePosition, std::error_code> getSamplePosition() {
             cwASIOSamples asp;
             cwASIOTimeStamp ats;
-            if(auto err = drv_->vtbl->getSamplePosition(drv_, &asp, &ats))
+            if(auto err = drv_->lpVtbl->getSamplePosition(drv_, &asp, &ats))
                 return std::unexpected(std::error_code(err, err_category()));
             return SamplePosition{ std::chrono::nanoseconds(qWord(ats)), qWord(asp) };
         }
 
         cwASIOError getChannelInfo(cwASIOChannelInfo &info) {
-            return drv_->vtbl->getChannelInfo(drv_, &info);
+            return drv_->lpVtbl->getChannelInfo(drv_, &info);
         }
 
         cwASIOError createBuffers(cwASIOBufferInfo *bufferInfos, long numChannels, long bufferSize, cwASIOCallbacks const *callbacks) {
-            return drv_->vtbl->createBuffers(drv_, bufferInfos, numChannels, bufferSize, callbacks);
+            return drv_->lpVtbl->createBuffers(drv_, bufferInfos, numChannels, bufferSize, callbacks);
         }
 
         cwASIOError disposeBuffers() {
-            return drv_->vtbl->disposeBuffers(drv_);
+            return drv_->lpVtbl->disposeBuffers(drv_);
         }
 
         cwASIOError controlPanel() {
-            return drv_->vtbl->controlPanel(drv_);
+            return drv_->lpVtbl->controlPanel(drv_);
         }
 
         cwASIOError future(long selector, void *opt) {
-            return drv_->vtbl->future(drv_, selector, opt);
+            return drv_->lpVtbl->future(drv_, selector, opt);
         }
 
         cwASIOError outputReady() {
-            return drv_->vtbl->outputReady(drv_);
+            return drv_->lpVtbl->outputReady(drv_);
         }
     };
 

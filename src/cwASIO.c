@@ -237,7 +237,7 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
 
 void cwASIOunload(struct cwASIODriver *drv) {
     if(drv)
-        drv->vtbl->Release(drv);
+        drv->lpVtbl->Release(drv);
 }
 
 /** @}*/
