@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #ifdef _WIN32
 #   include <combaseapi.h>
+#   include <guiddef.h>
 #   include <unknwnbase.h>
 #   include <winreg.h>
 #else
@@ -144,6 +145,13 @@ close_hkey:
 
 #else
 
+struct _GUID {
+    unsigned long  Data1;
+    unsigned short Data2;
+    unsigned short Data3;
+    unsigned char  Data4[8];
+};
+
 long cwASIOload(char const *path, struct cwASIODriver **drv) {
     void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
@@ -238,6 +246,16 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
 void cwASIOunload(struct cwASIODriver *drv) {
     if(drv)
         drv->lpVtbl->Release(drv);
+}
+
+bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b) {
+    if (!a || !b)
+        return a == b;
+    return a->Data1 == b->Data1 && a->Data2 == b->Data2 && a->Data3 == b->Data3
+        && a->Data4[0] == b->Data4[0] && a->Data4[1] == b->Data4[1]
+        && a->Data4[2] == b->Data4[2] && a->Data4[3] == b->Data4[3]
+        && a->Data4[4] == b->Data4[4] && a->Data4[5] == b->Data4[5]
+        && a->Data4[6] == b->Data4[6] && a->Data4[7] == b->Data4[7];
 }
 
 /** @}*/

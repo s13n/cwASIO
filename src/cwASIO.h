@@ -13,17 +13,9 @@
 #include <stdbool.h>
 
 #ifdef _WIN32
-#   include <guiddef.h>
 #   define CWASIO_METHOD __stdcall     // only relevant in 32-bit Windows
 #else
 #   define CWASIO_METHOD
-
-struct _GUID {
-    unsigned long  Data1;
-    unsigned short Data2;
-    unsigned short Data3;
-    unsigned char  Data4[8];
-};
 #endif
 
 typedef struct _GUID cwASIOGUID;
@@ -86,5 +78,12 @@ long cwASIOload(char const *key, struct cwASIODriver **drv);
  * @param drv Pointer to the driver instance that was initialized by cwASIOload()
  */
 void cwASIOunload(struct cwASIODriver *drv);
+
+/** Compare two GUIDs for equality.
+ * @param a Pointer to first GUID
+ * @param a Pointer to second GUID
+ * @return true if a and b are the same, false otherwise.
+ */
+bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b);
 
 /** @}*/

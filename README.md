@@ -47,7 +47,8 @@ TBC
 This uses the `FetchContent` module of CMake to fetch the cwASIO sources, and
 make them a part of the host application build.
 
-## Compatible API
+## APIs
+### Compatible API
 
 The compatible API attempts to mimick the original ASIO C API closely, so that
 applications that have been built with the original ASIO SDK can change to
@@ -60,7 +61,7 @@ it shares with the original ASIO SDK.
 
 This API is a thin C wrapper around the native API on each platform.
 
-## Native API
+### Native API
 
 You don't need to use the compatible API, there can be good reasons to use the
 native API. The most immediate benefit is the possibility of loading and using
@@ -74,7 +75,7 @@ should not be difficult to accommodate either in a portable application.
 The native API is declared in `cwASIO.h`. It is a C interface that can be
 used in C++ when included inside an `extern "C" { ... }` bracket.
 
-## C++ API
+### C++ API
 
 The C++ API is a thin wrapper around the native cwASIO C API, which converts it
 to ordinary C++ objects and uses data types from the C++ standard library. This
@@ -103,3 +104,51 @@ file.
 Note that you enumerate the installed drivers, not the audio devices that are
 actually connected and ready to be used! Whether an audio device is present and
 operable can only be determined once its driver is loaded.
+
+## ASIO compatibility details
+
+cwASIO is a reimplemetation of the Steinberg ASIO API that does not rely on
+Steinberg's ASIO SDK, thus avoiding infringing their copyright. Reimplementing
+an API is commonly regarded as fair use; a high-profile court case concerning
+this topic was decided in 2021 by the US Supreme Court, when Oracle sued Google
+over the use of declarations for the Java API, and lost. On a much smaller
+scale, cwASIO does this by providing a reimplementation of the ASIO driver API,
+without using any of the files provided with the Steinberg ASIO SDK.
+
+The reimplementation uses different type and function names from those in the
+ASIO SDK, hence both can be used simultaneously by the same host application
+without build errors, as long as the native cwASIO API is used. When using the
+ASIO compatibility API, there will be conflicts, hence only one can be used at
+the same time.
+
+The Steinberg ASIO SDK supports only Windows. Support for the Mac has been
+dropped with version 2.3, and other platforms weren't supported for a long time.
+On Windows, ASIO depends on Microsoft COM, but there are deviations from the
+COM rules that make it noncompliant. Consequently, an ASIO driver can be found
+and enumerated on the system using COM functionality, but it doesn't present a
+COM compliant API, due to issues with calling conventions. This is particularly
+prominent on 32-bit Windows, where compatibility with C is severely impaired.
+
+cwASIO regards 32-bit Windows as obsolete and thus takes advantage of the fact
+that the most serious problems don't exist on 64-bit Windows, because of its
+unified calling conventions. If you still must support 32-bit Windows, cwASIO
+may not be suitable for you. Support for 32-bit Linux should be fine, however.
+
+On Linux, the cwASIO API mimicks a COM interface to some extent, but since there
+is no system support for finding COM components, cwASIO used a different
+discovery mechanism based on entries in the `/etc/cwASIO` folder.
+
+Owing to its pedigree, ASIO relies on a struct with two 32-bit numbers for
+representing a 64-bit integer on the Windows platform. Even though 64-bit
+integers have been available natively for a long time, backwards compatibility
+has prevented ASIO from taking advantage of them on Windows. On other platforms,
+no such compatibility problem exists, hence we take the opportunity to use the
+native 64-bit integers. Writers of portable applications will have to take this
+into account when using cwASIO.
+
+The native cwASIO API is a C API that doesn't need C++ even on Windows. This
+makes it more widely applicable, since host applications can be written in
+languages with a C binding, which is much more common than a C++ binding. It
+also makes writing portable applications easier, since the API is the same
+everywhere. Furthermore, the native API allows a host application to have
+more than one driver loaded and used at the same time, if so desired.
