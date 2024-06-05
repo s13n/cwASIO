@@ -258,4 +258,13 @@ bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b) {
         && a->Data4[6] == b->Data4[6] && a->Data4[7] == b->Data4[7];
 }
 
+cwASIOGUID cwASIOtoGUID(char const *clsid) {
+    cwASIOGUID res;
+    int n = sscanf(clsid, "{%8lx-%4hx-%4hx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx}"
+        , &res.Data1, &res.Data2, &res.Data3
+        , &res.Data4[0], &res.Data4[1], &res.Data4[2], &res.Data4[3]
+        , &res.Data4[4], &res.Data4[5], &res.Data4[6], &res.Data4[7]);
+    return res;
+}
+
 /** @}*/

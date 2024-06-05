@@ -86,4 +86,11 @@ void cwASIOunload(struct cwASIODriver *drv);
  */
 bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b);
 
+/** Convert a class id in MS CLSID style to a GUID.
+ * The CLSID must include the curly braces.
+ * @param clsid The textual CLSID form.
+ * @return the resulting GUID
+ */
+cwASIOGUID cwASIOtoGUID(char const *clsid);
+
 /** @}*/
