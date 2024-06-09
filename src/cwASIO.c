@@ -153,18 +153,25 @@ struct _GUID {
     unsigned char  Data4[8];
 };
 
+typedef long (CWASIO_METHOD DllGetClassObject)(cwASIOGUID const *, cwASIOGUID const *, void **);
+
 long cwASIOload(char const *path, struct cwASIODriver **drv) {
     void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
         return ASE_NotPresent;
     
-    struct cwASIODriver *(*factory)(void) = dlsym(lib, "driverFactory");
+    DllGetClassObject *getFactory = dlsym(lib, "DllGetClassObject");
+    if (!getFactory)
+        return ASE_NotPresent;
+
+    IClassFactory *factory = NULL;
+    long err = getFactory(NULL, &IID_IClassFactory, &factory);
     if (!factory)
         return ASE_NotPresent;
 
-    *drv = factory();
+    err = factory->lpVtbl->CreateInstance(factory, NULL, NULL, drv);
 
-    return *drv ? ASE_OK : ASE_NotPresent;
+    return err ? ASE_OK : ASE_NotPresent;
 }
 
 static char *cwASIOreadConfig(char const *base, char const *name, char const *file) {
