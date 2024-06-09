@@ -58,13 +58,13 @@ static wchar_t *fromUTF8(char const *str) {
 };
 
 long cwASIOload(char const *key, struct cwASIODriver **drv) {
-    wchar_t *path = fromUTF8(key);
-    CLSID id;
-    HRESULT res = CLSIDFromString(path, &id);
-    free(path);
-    path = NULL;
-    if (FAILED(res))
-        return res;
+//    wchar_t *path = fromUTF8(key);
+    CLSID id = cwASIOtoGUID(key)
+//    HRESULT err = CLSIDFromString(path, &id);
+//    free(path);
+//    path = NULL;
+//    if (FAILED(err))
+//        return err;
 
     IClassFactory *factory = NULL;
     res = CoGetClassObject(&id, CLSCTX_INPROC_SERVER, NULL, &IID_IClassFactory, &factory);
@@ -153,7 +153,24 @@ struct _GUID {
     unsigned char  Data4[8];
 };
 
+struct IUnknown;
+struct ClassFactory;
+
+struct ClassFactoryVtbl {
+    long (CWASIO_METHOD *QueryInterface)(struct ClassFactory *, cwASIOGUID const *, void **);
+    unsigned long (CWASIO_METHOD *AddRef)(struct ClassFactory *);
+    unsigned long (CWASIO_METHOD *Release)(struct ClassFactory *);
+    long (CWASIO_METHOD *CreateInstance)(struct ClassFactory *, struct IUnknown *, cwASIOGUID const *, void **);
+    long (CWASIO_METHOD *LockServer)(struct ClassFactory *, int);
+};
+
+struct ClassFactory {
+    struct ClassFactoryVtbl const *lpVtbl;
+};
+
 typedef long (CWASIO_METHOD DllGetClassObject)(cwASIOGUID const *, cwASIOGUID const *, void **);
+
+static cwASIOGUID const IID_IClassFactory = {0x00000001, 0x0000, 0x0000, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46};
 
 long cwASIOload(char const *path, struct cwASIODriver **drv) {
     void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
@@ -164,12 +181,12 @@ long cwASIOload(char const *path, struct cwASIODriver **drv) {
     if (!getFactory)
         return ASE_NotPresent;
 
-    IClassFactory *factory = NULL;
-    long err = getFactory(NULL, &IID_IClassFactory, &factory);
+    struct ClassFactory *factory = NULL;
+    long err = getFactory(NULL, &IID_IClassFactory, (void**)&factory);
     if (!factory)
         return ASE_NotPresent;
 
-    err = factory->lpVtbl->CreateInstance(factory, NULL, NULL, drv);
+    err = factory->lpVtbl->CreateInstance(factory, NULL, NULL, (void**)drv);
 
     return err ? ASE_OK : ASE_NotPresent;
 }
