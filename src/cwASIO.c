@@ -9,8 +9,11 @@
  */
 
 #include "cwASIO.h"
+#include <inttypes.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #ifdef _WIN32
 #   include <combaseapi.h>
 #   include <guiddef.h>
@@ -22,7 +25,6 @@
 #   include <dlfcn.h>
 #   include <errno.h>
 #   include <fcntl.h>
-#   include <string.h>
 #   include <unistd.h>
 #   include <sys/stat.h>
 #endif
@@ -147,10 +149,10 @@ close_hkey:
 #else
 
 struct _GUID {
-    unsigned long  Data1;
-    unsigned short Data2;
-    unsigned short Data3;
-    unsigned char  Data4[8];
+    uint32_t Data1;
+    uint16_t Data2;
+    uint16_t Data3;
+    uint8_t  Data4[8];
 };
 
 struct IUnknown;
@@ -177,15 +179,17 @@ long cwASIOload(char const *path, struct cwASIODriver **drv) {
     if(!lib)
         return ASE_NotPresent;
     
-    DllGetClassObject *getFactory = dlsym(lib, "DllGetClassObject");
-    if (!getFactory)
+    DllGetClassObject *getClassObject = dlsym(lib, "DllGetClassObject");
+    if (!getClassObject)
         return ASE_NotPresent;
 
     struct ClassFactory *factory = NULL;
-    long err = getFactory(NULL, &IID_IClassFactory, (void**)&factory);
+    // Under Linux, we pass a NULL for the class ID; we don't need to check it.
+    long err = getClassObject(NULL, &IID_IClassFactory, (void**)&factory);
     if (!factory)
         return ASE_NotPresent;
 
+    // Under Linux, we pass a NULL for the interface ID; we don't need to check it.
     err = factory->lpVtbl->CreateInstance(factory, NULL, NULL, (void**)drv);
 
     return err ? ASE_OK : ASE_NotPresent;
@@ -274,18 +278,12 @@ void cwASIOunload(struct cwASIODriver *drv) {
 }
 
 bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b) {
-    if (!a || !b)
-        return a == b;
-    return a->Data1 == b->Data1 && a->Data2 == b->Data2 && a->Data3 == b->Data3
-        && a->Data4[0] == b->Data4[0] && a->Data4[1] == b->Data4[1]
-        && a->Data4[2] == b->Data4[2] && a->Data4[3] == b->Data4[3]
-        && a->Data4[4] == b->Data4[4] && a->Data4[5] == b->Data4[5]
-        && a->Data4[6] == b->Data4[6] && a->Data4[7] == b->Data4[7];
+    return a && b ? 0 == memcmp(a, b, sizeof(cwASIOGUID)) : a == b;
 }
 
 cwASIOGUID cwASIOtoGUID(char const *clsid) {
     cwASIOGUID res;
-    int n = sscanf(clsid, "{%8lx-%4hx-%4hx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx}"
+    int n = sscanf(clsid, "{%8" SCNx32 "-%4" SCNx16 "-%4" SCNx16 "-%2" SCNx8 "%2" SCNx8 "-%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "}"
         , &res.Data1, &res.Data2, &res.Data3
         , &res.Data4[0], &res.Data4[1], &res.Data4[2], &res.Data4[3]
         , &res.Data4[4], &res.Data4[5], &res.Data4[6], &res.Data4[7]);
