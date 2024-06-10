@@ -61,7 +61,7 @@ static wchar_t *fromUTF8(char const *str) {
 
 long cwASIOload(char const *key, struct cwASIODriver **drv) {
 //    wchar_t *path = fromUTF8(key);
-    CLSID id = cwASIOtoGUID(key)
+    CLSID id = cwASIOtoGUID(key);
 //    HRESULT err = CLSIDFromString(path, &id);
 //    free(path);
 //    path = NULL;
@@ -178,7 +178,7 @@ long cwASIOload(char const *path, struct cwASIODriver **drv) {
     void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
         return ASE_NotPresent;
-    
+
     DllGetClassObject *getClassObject = dlsym(lib, "DllGetClassObject");
     if (!getClassObject)
         return ASE_NotPresent;
