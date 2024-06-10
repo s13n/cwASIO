@@ -60,16 +60,9 @@ static wchar_t *fromUTF8(char const *str) {
 };
 
 long cwASIOload(char const *key, struct cwASIODriver **drv) {
-//    wchar_t *path = fromUTF8(key);
     CLSID id = cwASIOtoGUID(key);
-//    HRESULT err = CLSIDFromString(path, &id);
-//    free(path);
-//    path = NULL;
-//    if (FAILED(err))
-//        return err;
-
     IClassFactory *factory = NULL;
-    res = CoGetClassObject(&id, CLSCTX_INPROC_SERVER, NULL, &IID_IClassFactory, &factory);
+    HRESULT res = CoGetClassObject(&id, CLSCTX_INPROC_SERVER, NULL, &IID_IClassFactory, &factory);
     if (FAILED(res))
         return res;
     if (!factory || !factory->lpVtbl)
