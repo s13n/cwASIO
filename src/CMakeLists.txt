@@ -23,15 +23,19 @@ endif()
 target_sources(cwASIO_lib
 PUBLIC
     cwASIO.h
-    cwASIO.hpp
     cwASIOtypes.h
 PRIVATE
     cwASIO.c
 )
 
-set_property(TARGET cwASIO_lib PROPERTY PUBLIC_HEADER asio.h cwASIOtypes.h cwASIO.h cwASIO.hpp)
-target_compile_features(cwASIO_lib PUBLIC cxx_std_23)
+set_property(TARGET cwASIO_lib PROPERTY PUBLIC_HEADER asio.h cwASIOtypes.h cwASIO.h)
 target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Define C++ wrapper as an interface library
+add_library(cwASIO_libxx INTERFACE cwASIO.hpp)
+target_compile_features(cwASIO_libxx INTERFACE cxx_std_23)
+target_link_libraries(cwASIO_libxx INTERFACE cwASIO::lib)
+set_property(TARGET cwASIO_libxx PROPERTY PUBLIC_HEADER cwASIO.hpp)
 
 # Build ASIO compatibility wrapper
 add_library(cwASIO_asio ${CWASIO_LIBTYPE} asio/asio.c asio/asio.h)
