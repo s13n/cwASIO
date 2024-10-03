@@ -152,3 +152,22 @@ languages with a C binding, which is much more common than a C++ binding. It
 also makes writing portable applications easier, since the API is the same
 everywhere. Furthermore, the native API allows a host application to have
 more than one driver loaded and used at the same time, if so desired.
+
+## Writing a driver
+
+cwASIO includes two code skeletons that you can use as a starting point for your
+own driver implementation. One is for a driver written in C, and the other for
+C++. There are numerous places in the skeletons where you are supposed to insert
+your own code. They are marked with a brief comment.
+
+The skeletons are supported by some elementary scaffolding for dealing with
+system specifics like complying with the rules for dynamically loadable modules,
+and their registration in the system, to support portability of your code. This
+support code is contained in `cwASIOdriver.h` and `cwASIOdriver.c` files.
+
+A driver is a shared library suitable for being loaded at runtime by a host
+application. For the host application to be able to find it on the host system,
+it must be registered, which is a process that depends on the OS used. The
+information necessary for this registration process is a few GUIDs and some
+texts that identify and describe the driver. You must fill in those values that
+are specific for your driver.

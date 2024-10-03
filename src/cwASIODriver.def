@@ -1,0 +1,13 @@
+; Module-definition file for a cwASIOdriver DLL for Windows.
+; The DLL implements a COM class factory, so we just need to export the functions required by COM.
+; This includes functions for registering and deregistering the COM class in the Windows registry.
+; We can't use declspec(dllexport) for those because the naming convention doesn't match (leading "@")
+
+LIBRARY
+
+EXPORTS
+    DllMain             PRIVATE
+    DllCanUnloadNow     PRIVATE
+    DllGetClassObject   PRIVATE
+    DllRegisterServer   PRIVATE
+    DllUnregisterServer PRIVATE
