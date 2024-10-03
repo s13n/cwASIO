@@ -32,8 +32,9 @@ set_property(TARGET cwASIO_lib PROPERTY PUBLIC_HEADER asio.h cwASIOtypes.h cwASI
 target_include_directories(cwASIO_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Build the driver library
-add_library(cwASIO_driver STATIC cwASIOtypes.h cwASIO.h cwASIO.c cwASIOdriver.h cwASIOdriver.c cwASIOdriver.def)
+add_library(cwASIO_driver STATIC)
 add_library(cwASIO::driver ALIAS cwASIO_driver)
+target_sources(cwASIO_driver PRIVATE cwASIOtypes.h cwASIO.h cwASIO.c cwASIOdriver.h cwASIOdriver.c cwASIOdriver.def)
 target_include_directories(cwASIO_driver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(cwASIO_driver PUBLIC c_std_11)
 target_compile_options(cwASIO_driver

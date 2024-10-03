@@ -16,6 +16,8 @@
 #   include <guiddef.h>
 #   include <Winerror.h>
 #else
+#   include <errno.h>
+#   include <wchar.h>
 
 // we try to mimick the Windows-specific error types to Linux errors.
 enum {
