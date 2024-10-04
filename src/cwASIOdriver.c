@@ -9,6 +9,7 @@
  */
 
 #include "cwASIOdriver.h"
+#include <stdbool.h>
 
 #ifdef _WIN32
 #   include <olectl.h>
@@ -51,8 +52,26 @@ struct ClassFactory {
 static cwASIOGUID const clsidIUnknown      = {0x00000000,0x0000,0xc000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x46};
 static cwASIOGUID const clsidIClassFactory = {0x00000001,0x0000,0xc000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x46};
 
-atomic_uint activeInstances = 0;
-static atomic_uint lockCount = 0;
+#ifdef _WIN32
+    typedef LONG dll_use_count_t;
+    static LONG dllUseCount = 0;
+    static dll_use_count_t updateDllUseCount(bool increaseNotDecrease) {
+        if (increaseNotDecrease)
+            return InterlockedIncrease(&dllUseCount);
+        else
+            return InterlockedDecrease(&dllUseCount);
+    }
+#elif __GNUC__
+    typedef int dll_use_count_t;
+    static int dllUseCount(bool increaseNotDecrease) {
+        if (increaseNotDecrease)
+            return __sync_add_and_fetch(&dllUseCount, 1);
+        else
+            return __sync_sub_and_fetch(&dllUseCount, 1);
+    }
+#else
+    #error unsupported compiler
+#endif
 
 static long CWASIO_METHOD queryInterface(struct ClassFactory *self, cwASIOGUID const *guid, void **ppv) {
     // Check if the GUID matches an IClassFactory or IUnknown GUID.
@@ -68,11 +87,15 @@ static long CWASIO_METHOD queryInterface(struct ClassFactory *self, cwASIOGUID c
 }
 
 static unsigned long CWASIO_METHOD addRef(struct ClassFactory *f) {
-    return 1UL;
+    dll_use_count_t result = updateDllUseCount(true);
+    assert(result > 0);
+    return result;
 }
 
 static unsigned long CWASIO_METHOD release(struct ClassFactory *f) {
-    return 1UL;
+    dll_use_count_t result = updateDllUseCount(false);
+    assert(result >= 0);
+    return result;
 }
 
 static long CWASIO_METHOD createInstance(struct ClassFactory *f, struct IUnknown *outer, cwASIOGUID const *guid, void **ppv) {
@@ -99,16 +122,16 @@ static long CWASIO_METHOD createInstance(struct ClassFactory *f, struct IUnknown
     obj->lpVtbl->Release(obj);
 
     if (!hr)
-        atomic_fetch_add(&activeInstances, 1);
+        updateDllUseCount(true);
 
     return hr;
 }
 
 static long CWASIO_METHOD lockServer(struct ClassFactory *f, int flock) {
     if (flock)
-        ++lockCount;
+        updateDllUseCount(true);
     else
-        --lockCount;
+        updateDllUseCount(false);
 
     return 0L;
 }
@@ -125,7 +148,7 @@ static struct ClassFactory driverFactory = { &driverFactoryVtbl };
 
 #ifdef _WIN32
 
-MODULE_EXPORT long CWASIO_METHOD DllGetClassObject(cwASIOGUID const *objGuid, cwASIOGUID const *factoryGuid, void **factoryHandle) {
+MODULE_EXPORT HRESULT CWASIO_METHOD DllGetClassObject(cwASIOGUID const *objGuid, cwASIOGUID const *factoryGuid, void **factoryHandle) {
     // Check that the caller is passing our GUID. That's the COM object our DLL implements.
     if (cwASIOcompareGUID(objGuid, &cwAsioDriverCLSID)) {
         // Fill in the caller's handle with a pointer to our factory object. We'll let our queryInterface do that, because it also
@@ -139,11 +162,12 @@ MODULE_EXPORT long CWASIO_METHOD DllGetClassObject(cwASIOGUID const *objGuid, cw
     }
 }
 
-MODULE_EXPORT long CWASIO_METHOD DllCanUnloadNow() {
+MODULE_EXPORT HRESULT CWASIO_METHOD DllCanUnloadNow() {
     // If someone has retrieved pointers to any of our objects, and not yet Release()'ed them,
     // then we return false to indicate not to unload this DLL.
     // Also, if someone has us locked, return false
-    return atomic_load(&activeInstances) || atomic_load(&lockCount);
+    assert(dllUseCount >= 0);
+    return dllUseCount <= 0 ? S_OK : S_FALSE;
 }
 
 static HMODULE ownModule = NULL;
@@ -165,36 +189,36 @@ static DWORD sizeInChars(wchar_t const *string) {
  * from the running module, so the installer should put the driver DLL into its final place
  * before loading the DLL and calling this function.
  */
-MODULE_EXPORT long CWASIO_METHOD DllRegisterServer(void) {
+MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     enum {buffersize = 2048};   // the maximum string size MS recommends in the registry for performance reasons
     LSTATUS err = 0;
     //write the default value
     wchar_t buffer[buffersize];
     int n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverDescription, -1, buffer, buffersize);
     if(n <= 0)
-        return GetLastError();
+        return HRESULT_FROM_WIN32(GetLastError());
     wchar_t subkey[256] = L"CLSID\\";
     stringFromGUID(&cwAsioDriverCLSID, subkey + wcslen(subkey));    // append CLSID
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n));
     if (err)
-        return err;
+        return HRESULT_FROM_WIN32(err);
     n = wcslen(subkey);     // remember length so far for further appending
     //write the HKCR\CLSID\{---}\InprocServer32 default key, i.e. the path to the DLL
     GetModuleFileNameW(ownModule, buffer, buffersize);
     wcscpy(subkey + n, L"\\InprocServer32");
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, sizeInChars(buffer));
     if (err)
-        return err;
+        return HRESULT_FROM_WIN32(err);
     //write the HKCR\CLSID\{---}\InprocServer32\\ThreadingModel value
     wchar_t thmod[] = L"Both";
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, L"ThreadingModel", REG_SZ, thmod, sizeInChars(thmod));
     if (err)
-        return err;
+        return HRESULT_FROM_WIN32(err);
     //write the "ProgId" key data under HKCR\CLSID\{---}\ProgID
     wcscpy(subkey + n, L"\\ProgID");
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, cwAsioDriverProgID, sizeInChars(cwAsioDriverProgID));
     if (err)
-        return err;
+        return HRESULT_FROM_WIN32(err);
     //write the "CLSID" entry data under HKLM\SOFTWARE\ASIO\<key>
     stringFromGUID(&cwAsioDriverLibID, buffer);
     wcscpy(subkey, L"SOFTWARE\\ASIO\\");
@@ -202,17 +226,17 @@ MODULE_EXPORT long CWASIO_METHOD DllRegisterServer(void) {
     n += MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, buffer + n, buffersize - n);      // append Key
     err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n));
     if (err)
-        return err;
+        return HRESULT_FROM_WIN32(err);
     //write the "Description" entry data under HKLM\SOFTWARE\ASIO\<key>
     n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverDescription, -1, buffer, buffersize);
     err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"Description", REG_SZ, buffer, sizeInChars(buffer));
-    return err;
+    return HRESULT_FROM_WIN32(err);
 }
 
 /** Remove registration info from registry.
  * This function removes what `DllRegisterServer` has added.
  */
-MODULE_EXPORT long CWASIO_METHOD DllUnregisterServer(void) {
+MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
     LSTATUS err = 0;
     //remove the entire tree in HKLM\SOFTWARE\ASIO
     wchar_t subkey[256] = L"SOFTWARE\\ASIO\\";
@@ -220,12 +244,12 @@ MODULE_EXPORT long CWASIO_METHOD DllUnregisterServer(void) {
     MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, 256 - n);      // append Key
     err = RegDeleteTreeW(HKEY_LOCAL_MACHINE, subkey);
     if (err)
-        return err;
+        return HRESULT_FROM_WIN32(err);
     //remove the entire tree in HKCR\clsid
     wcscpy(subkey, L"CLSID\\");
     stringFromGUID(&cwAsioDriverCLSID, subkey + wcslen(subkey));    // append CLSID
     err = RegDeleteTreeW(HKEY_CLASSES_ROOT, subkey);
-    return err;
+    return HRESULT_FROM_WIN32(err);
 }
 
 MODULE_EXPORT BOOL CWASIO_METHOD DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {

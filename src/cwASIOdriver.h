@@ -10,7 +10,6 @@
 #pragma once
 
 #include "cwASIO.h"
-#include <stdatomic.h>
 
 #ifdef _WIN32
 #   include <guiddef.h>
@@ -63,12 +62,6 @@ extern char const *cwAsioDriverDescription;
  * This will be used in driver registration under Windows.
  */
 extern wchar_t const *cwAsioDriverProgID;
-
-/** Counter of active instances managed by this module.
- * As long as the count is greater than zero, the module may not be unloaded.
- * We use a threadsafe counter to support arbitrary threading arrangements.
- */
-extern atomic_uint activeInstances;
 
 /** Make an instance of the driver.
  * Implement this function to create an instance of the driver object and return a pointer to it.
