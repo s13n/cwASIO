@@ -18,8 +18,15 @@
 
 #   define MODULE_EXPORT    // this is taken care of by the .def file
 #else
-#   include <time.h>
+#   define __USE_GNU
+#   include <dlfcn.h>
 #   include <errno.h>
+#   include <fcntl.h>
+#   include <stdio.h>
+#   include <string.h>
+#   include <time.h>
+#   include <unistd.h>
+#   include <sys/stat.h>
 
 #   define MODULE_EXPORT __attribute__((visibility("protected")))
 #endif
@@ -49,8 +56,8 @@ struct ClassFactory {
     struct ClassFactoryVtbl const *lpVtbl;
 };
 
-static cwASIOGUID const clsidIUnknown      = {0x00000000,0x0000,0xc000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x46};
-static cwASIOGUID const clsidIClassFactory = {0x00000001,0x0000,0xc000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x46};
+static cwASIOGUID const iidIUnknown      = {0x00000000,0x0000,0x0000,0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46};
+static cwASIOGUID const iidIClassFactory = {0x00000001,0x0000,0x0000,0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46};
 
 #ifdef _WIN32
     typedef LONG dll_use_count_t;
@@ -74,8 +81,8 @@ static cwASIOGUID const clsidIClassFactory = {0x00000001,0x0000,0xc000,0x00,0x00
 #endif
 
 static long CWASIO_METHOD queryInterface(struct ClassFactory *self, cwASIOGUID const *guid, void **ppv) {
-    // Check if the GUID matches an IClassFactory or IUnknown GUID.
-    if (!cwASIOcompareGUID(guid, &clsidIUnknown) && !cwASIOcompareGUID(guid, &clsidIClassFactory)) {
+    // Check if the GUID matches an IClassFactory or IUnknown IID.
+    if (!cwASIOcompareGUID(guid, &iidIUnknown) && !cwASIOcompareGUID(guid, &iidIClassFactory)) {
         *ppv = 0;
         return E_NOINTERFACE;
     }
@@ -173,7 +180,7 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllCanUnloadNow() {
 static HMODULE ownModule = NULL;
 
 static void stringFromGUID(cwASIOGUID const *guid, wchar_t *buffer) {
-    swprintf(buffer, 37, L"{%08x-%04x-%04x-%02x%02x%02x%02x%02x%02x%02x%02x}"
+    swprintf(buffer, 37, L"{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}"
         , guid->Data1, guid->Data2, guid->Data3
         , guid->Data4[0], guid->Data4[1], guid->Data4[2], guid->Data4[3]
         , guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7]);
@@ -280,6 +287,81 @@ MODULE_EXPORT BOOL CWASIO_METHOD DllMain(HINSTANCE hinst, DWORD reason, LPVOID r
 }
 
 #else // not _WIN32
+
+/** Put registration info into /etc/cwASIO.
+ *
+ * This function is called by installers to register the driver with the system.
+ * It is required for enumerating the driver on a Linux system. It determines
+ * the path to the driver from the running module, so the installer should put
+ * the driver shared object into its final place before loading it and calling
+ * this function.
+ * 
+ * Note that the `/etc/cwASIO` directory must exist and be writable, please
+ * ensure that before calling this function, otherwise this function fails.
+ */
+MODULE_EXPORT long CWASIO_METHOD registerDriver(void) {
+    char buf[2048];
+    //assemble the path
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", cwAsioDriverKey);
+    if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
+        return EINVAL;
+    //make the driver's registration directory
+    if(0 != mkdir(buf, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH))
+        return errno;
+    //write the "driver" file under /etc/cwASIO/<key>
+    Dl_info info;
+    if(!dladdr(&registerDriver, &info))
+        return EINVAL;
+    strcpy(buf+n, "/driver");
+    int fd = creat(buf, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
+    if(fd < 0)
+        return errno;
+    int ret = write(fd, info.dli_fname, strlen(info.dli_fname));
+    int err = errno;
+    close(fd);
+    if(ret < 0)
+        return err;
+    //write the "description" file under /etc/cwASIO/<key>
+    strcpy(buf+n, "/description");
+    fd = creat(buf, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
+    if(fd < 0)
+        return errno;
+    ret = write(fd, cwAsioDriverDescription, strlen(cwAsioDriverDescription));
+    err = errno;
+    close(fd);
+    if(ret < 0)
+        return err;
+    return 0;
+}
+
+/** Remove registration info. This function removes what `registerDriver` has
+ * added.
+ *
+ * Note that only the two files `driver` and `description` are removed. If the
+ * directory isn't empty thereafter, it won't be removed, in order to preserve
+ * any data that was added in a different way. If the caller wants to ensure
+ * that the directory gets deleted, too, it needs to remove all other files
+ * before calling this function.
+ */
+MODULE_EXPORT long CWASIO_METHOD unregisterDriver(void) {
+    char buf[2048];
+    //assemble the path
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", cwAsioDriverKey);
+    if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
+        return EINVAL;
+
+    strcpy(buf+n, "/description");
+    if( 0 != unlink(buf))
+        return errno;
+    strcpy(buf+n, "/driver");
+    if( 0 != unlink(buf))
+        return errno;
+    buf[n] = '\0';
+    if(0 != rmdir(buf))
+        return errno;
+    return 0;
+}
+
 #endif
 
 /** @}*/
