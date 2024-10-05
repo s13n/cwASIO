@@ -68,6 +68,11 @@ long cwASIOload(char const *key, struct cwASIODriver **drv) {
     return 0;
 }
 
+void cwASIOunload(struct cwASIODriver *drv) {
+    if(drv)
+        drv->lpVtbl->Release(drv);
+}
+
 static LSTATUS getValue(HKEY hkey, wchar_t *subKey, wchar_t *name, wchar_t **val, DWORD *len) {
     LSTATUS err = ERROR_SUCCESS;
     for (;;) {    // try until buffer size is sufficient
