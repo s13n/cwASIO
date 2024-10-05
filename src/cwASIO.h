@@ -59,7 +59,7 @@ typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
  * for every entry found in the installed drivers list. If the enumeration function
  * returns with a true result, enumeration continues with the next entry, otherwise
  * enumeration terminates. Three strings are passed to the enumeration function:
- * Name, Path and Description. The latter two might be empty, if the corresponding
+ * Name, ID and Description. The latter two might be empty, if the corresponding
  * drivers list entry is empty or absent. You might want to ignore such entries.
  * @param cb Pointer to callback function
  * @param context Pointer to be forwarded to callback function as its first parameter.
@@ -72,7 +72,7 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context);
  * @param drv Receives a pointer to the driver instance.
  * @return an error code when unsuccessful, zero on success.
  */
-long cwASIOload(char const *key, struct cwASIODriver **drv);
+long cwASIOload(char const *id, struct cwASIODriver **drv);
 
 /** Unload the driver.
  * @param drv Pointer to the driver instance that was initialized by cwASIOload()
