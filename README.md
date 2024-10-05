@@ -248,12 +248,11 @@ support code is contained in `cwASIOdriver.h` and `cwASIOdriver.c` files.
 
 A driver is a shared library suitable for being loaded at runtime by a host
 application. For the host application to be able to find it on the host system,
-it must be registered, which is a process that depends on the OS used. The
-information necessary for this registration process is a few GUIDs and some
-texts that identify and describe the driver. You must fill in those values that
-are specific for your driver.
+it must be registered, which is a process that depends on the OS used. You must
+provide the information necessary for this registration process by initializing
+a few global constants.
 
-### About GUIDs
+### Windows specifics, including the use of GUIDs
 
 On Windows, ASIO has always used GUIDs to unambiguously identify different
 drivers. This is part of the Microsoft Component Object Model (COM), which
@@ -299,3 +298,71 @@ The bottomline is that a driver provider must generate a unique GUID for the
 driver, which is built into the driver code. This GUID is used in registering
 the driver with your system, usually as part of the driver installation process,
 and in creating a driver instance for use by an audio application.
+
+## Installing the driver
+
+Once your driver is built, it is contained in a DLL (Windows) or a shared object
+file (Linux). For a host application to be able to find and load it, it must be
+registered with the system. The driver contains functions you can call as part
+of the installation process, to create the necessary entries in the system
+registry. The process is different between Linux and Windows, and the functions
+to call are also different. This is appropriate, as you will also need to
+provide different installers for Linux and Windows.
+
+Creating installers for the systems you want to support is up to you. There is
+only minimal support in cwASIO, in the form of registration/unregistration
+functions.
+
+In general, the process is to put the driver file into the place where you want
+it to be, in the system's directory tree, and then to load the driver and call
+its registration function. Then unload the driver again.
+
+Uninstalling is the process in reverse; you load the driver, call its
+unregistration function, unload the driver, and then clean up by deleting the
+driver file, and anything else that might need deleting.
+
+### Installing on Windows
+
+On Windows, you will most probably want to install the driver into a
+subdirectory of the "Program Files" directory, but you would typically provide
+the user with an opportunity to change that location. Wherever the driver ends
+up being placed, you need to first put it there, and then load it and call its
+`DllRegisterServer` function. You would not normally do this yourself, but you
+would use the `Regsrv32` utility to do this for you. This is a command line
+utility that your installer would call to do the registration.
+
+Uninstalling uses the same utility, which calls the `DllUnregisterServer`
+function of the driver. After that, you would delete the driver file and the
+directory you created.
+
+There are two versions of the `Regsrv32` utility, a 64-bit version and a 32-bit
+version. The have the same name, but are located in different places in the file
+system, so don't let the file name mislead you. To register a 64-bit driver, you
+need to use the 64-bit version of `Regsrv32`. Likewise, to register a 32-bit
+version of the driver, you need to use the 32-bit version of `Regsrv32` utility.
+
+For the details, please refer to the documentation of `Regsrv32` by Microsoft.
+
+### Installing on Linux
+
+The installation location of the driver on Linux will probably depend on the
+distribution you target. We don't prescribe anything here, you make your own
+choices. Otherwise the process involves calling the function `registerDriver`
+during installation, and `unregisterDriver` during deinstallation. Those two
+functions take care of maintaining the entry in `/etc/cwASIO`. It is the job of
+your installer to take care of copying/deleting the actual driver file, and any
+further files and directories your driver might need.
+
+On Linux, there is no utility comparable with `Regsrv32` on Windows, so you need
+to call the functions mentioned above by yourself.
+
+Note that `unregisterDriver` can't delete the subdirectory that `registerDriver`
+created, unless it is empty after deleting the files `driver` and `description`.
+Your installer or driver may create additional files in there, but when
+uninstalling, they should be deleted before calling `unregisterDriver`, except
+if you deliberately want to keep the directory.
+
+Of course, you must have the right to write to `/etc/cwASIO`, otherwise the
+calls to `registerDriver` or `unregisterDriver` will fail with an error
+indicating isufficient rights. Both functions return 0 on success, and an errno
+in case of failure.
