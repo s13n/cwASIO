@@ -223,11 +223,6 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, L"ThreadingModel", REG_SZ, thmod, sizeInChars(thmod));
     if (err)
         return HRESULT_FROM_WIN32(err);
-    //write the "ProgId" key data under HKCR\CLSID\{---}\ProgID
-    wcscpy(subkey + n, L"\\ProgID");
-    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, cwAsioDriverProgID, sizeInChars(cwAsioDriverProgID));
-    if (err)
-        return HRESULT_FROM_WIN32(err);
     //write the "CLSID" entry data under HKLM\SOFTWARE\ASIO\<key>
     stringFromGUID(&cwAsioDriverLibID, buffer);
     wcscpy(subkey, L"SOFTWARE\\ASIO\\");
@@ -300,8 +295,10 @@ MODULE_EXPORT BOOL CWASIO_METHOD DllMain(HINSTANCE hinst, DWORD reason, LPVOID r
  * 
  * Note that the `/etc/cwASIO` directory must exist and be writable, please
  * ensure that before calling this function, otherwise this function fails.
+ * 
+ * The function returns 0 on success, otherwise it returns an errno value.
  */
-MODULE_EXPORT long CWASIO_METHOD registerDriver(void) {
+MODULE_EXPORT int registerDriver(void) {
     char buf[2048];
     //assemble the path
     int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", cwAsioDriverKey);
@@ -344,8 +341,10 @@ MODULE_EXPORT long CWASIO_METHOD registerDriver(void) {
  * any data that was added in a different way. If the caller wants to ensure
  * that the directory gets deleted, too, it needs to remove all other files
  * before calling this function.
+ * 
+ * The function returns 0 on success, otherwise it returns an errno value.
  */
-MODULE_EXPORT long CWASIO_METHOD unregisterDriver(void) {
+MODULE_EXPORT int unregisterDriver(void) {
     char buf[2048];
     //assemble the path
     int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", cwAsioDriverKey);

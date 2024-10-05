@@ -58,11 +58,6 @@ extern char const *cwAsioDriverKey;
  */
 extern char const *cwAsioDriverDescription;
 
-/** The ProgID string to use under Windows.
- * This will be used in driver registration under Windows.
- */
-extern wchar_t const *cwAsioDriverProgID;
-
 /** Make an instance of the driver.
  * Implement this function to create an instance of the driver object and return a pointer to it.
  * 
