@@ -65,9 +65,9 @@ static cwASIOGUID const iidIClassFactory = {0x00000001,0x0000,0x0000,0xc0,0x00,0
     static LONG dllUseCount = 0;
     static dll_use_count_t updateDllUseCount(bool increaseNotDecrease) {
         if (increaseNotDecrease)
-            return InterlockedIncrease(&dllUseCount);
+            return InterlockedIncrement(&dllUseCount);
         else
-            return InterlockedDecrease(&dllUseCount);
+            return InterlockedDecrement(&dllUseCount);
     }
 #elif __GNUC__
     typedef int dll_use_count_t;
