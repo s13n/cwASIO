@@ -105,6 +105,87 @@ Note that you enumerate the installed drivers, not the audio devices that are
 actually connected and ready to be used! Whether an audio device is present and
 operable can only be determined once its driver is loaded.
 
+### The enumeration and instantiation process on Windows
+
+On Windows, enumerating ASIO drivers is done by scanning through the Windows
+Registry. Each installed ASIO driver is represented by a key inside
+`HKEY_LOCAL_MACHINE\SOFTWARE\ASIO`. The key name itself is arbitrary text, but
+inside a set of values are required:
+
+- A value named `CLSID` that contains a GUID in its textual representation,
+  within curly braces. This is the class ID of the driver, which must be unique
+  for each driver.
+- A value named `Description` that contains a short text that can be presented
+  to a user to identify the driver.
+
+For each registered driver, those two values are presented to the caller of
+`cwASIOenumerate()`, along with the key name. The class ID can be used to locate
+the driver DLL in the file system, a process implemented by the `cwASIOload()`
+function, which does the following:
+
+- The GUID of the class ID is used to find the corresponding entry in the
+  Windows Registry key `HKEY_CLASSES_ROOT\CLSID`.
+- The entry found must contain the following subkeys: `InprocServer32`, `ProgID`
+  and `Version`. All three contain default values, the first one additionally
+  contains a value named `ThreadingModel`. All this is mandated by Microsoft
+  COM.
+- The full path to the driver DLL is contained in the default value of
+  `InprocServer32`. It is used to load the DLL into memory and initialize it.
+- The DLL is called to produce a class factory, which is an object used to
+  create other objects.
+- The class factory is used to create a driver instance, which is the object
+  that implements the ASIO driver functionality.
+
+Once the driver instance is created, it must be initialized with a call to its
+`init()` method. At that point, the driver typically checks if the hardware is
+present and functional, and if so initializes it. Thereafter, the driver should
+be functional.
+
+There is one more complication on Windows: Applications can be 32-bit or 64-bit,
+and both may run on a 64-bit Windows host. Each of them needs its own driver,
+i.e. you must provide the same driver in a 64-bit version and a 32-bit version.
+Typically, you will compile the same driver source code twice, once in 32-bit
+mode and once in 64-bit mode. Both have the same CLSID, but they need to be
+registered separately.
+
+Even though the two versions are registered in different locations in the
+Windows Registry, Windows makes it appear to applications as if the path was the
+same in both cases. A 32-bit application sees the 32-bit registration
+information, and a 64-bit application sees the 64-bit registration information.
+Therefore, enumeration is exactly the same for both kinds of application, and
+they automatically see the appropriate information.
+
+It is possible that an ASIO driver is only available in one of the two variants,
+in which case only the matching applications can use it. If you only have a
+32-bit driver, only 32-bit applications can use it, and likewise with 64-bit.
+
+Note that when looking at the Registry with a 64-bit tool, the 32-bit entries
+are visible under `HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\ASIO` and
+`HKEY_CLASSES_ROOT\WOW6432Node\CLSID`.
+
+### The enumeration and instantiation process on Linux
+
+On Linux, cwASIO drivers are registered in `/etc/cwASIO`. Each driver is
+described by a subdirectory therein. The name of the subdirectory is the
+equivalent of the key name under `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` in the
+Windows Registry. Each subdirectory contains at least the following two files:
+
+- `driver` contains the full path to the driver shared object file as the ID
+  string.
+- `description` contains a brief descriptive text intended to be presented to a
+  user for identifying the driver.
+
+For each subdirectory, the contents of those two files are presented to the
+caller of `cwASIOenumerate()`, along with the name of the subdirectory. In
+contrast to Windows, there is no need for looking up the driver file path in a
+COM class registry, it is contained in the ID string directly. The
+`cwASIOload()` function used to load the driver takes advantage of this, and
+uses the ID string directly to load the driver.
+
+In the same way as on Windows, the driver instance needs to be initialized with
+a call to its `init()` method, at which point it checks and initializes the
+hardware.
+
 ## ASIO compatibility details
 
 cwASIO is a reimplemetation of the Steinberg ASIO API that does not rely on
@@ -171,3 +252,50 @@ it must be registered, which is a process that depends on the OS used. The
 information necessary for this registration process is a few GUIDs and some
 texts that identify and describe the driver. You must fill in those values that
 are specific for your driver.
+
+### About GUIDs
+
+On Windows, ASIO has always used GUIDs to unambiguously identify different
+drivers. This is part of the Microsoft Component Object Model (COM), which
+stipulates that both classes and interfaces are identified with a unique GUID,
+which is also used for discovery via the Microsoft Windows Registry. We use them
+in cwASIO forLinux, too, to a certain extent, in order to maintain a level of
+similarity between the systems.
+
+A GUID is a 128-bit data structure that is defined and described in RFC 9562, or
+equivalently in ITU-T Rec. X.667. There is a binary representation and a textual
+representation. The binary representation is using a big-endian format when
+exchanged between systems, but the in-memory representation within a computer
+may use other representations (and on little-endian systems that is often the
+case). The textual representation uses hex digits and suffers from ambiguities
+due to upper and lowercase letters being both allowed. The recommended
+representation uses lowercase, but uppercase or mixed case must also be
+accepted. We use the 8-4-4-4-12 format with braces, the Microsoft standard.
+
+The use of a big-endian binary representation means that the order of the hex
+digits in the textual representation matches the order in a hexdump of the
+binary representation. For an in-memory representation, that doesn't necessarily
+apply. For example, the type `cwASIOGUID` on a little-endian system will show a
+different in-memory byte ordering than what the official binary representation
+stipulates.
+
+In cwASIO, we generate the textual representation on demand, and use the binary
+representation internally. The generated textual representation uses lowercase
+hex digits. When reading a textual representation, both cases are accepted. In
+the Windows Registry, key comparison is case insensitive, hence a GUID can be
+used in its textual representation as a Registry key without problems. When
+doing your own comparisons, however, be aware of this problem.
+
+In ASIO, the GUID that serves as the class ID to locate the driver on the
+system, does double duty as the interface ID when creating a driver instance.
+Those would normally be distinct GUIDs, but ASIO chose to simplify things. *(In
+theory, a class and an interface are not the same thing. A class may implement
+several different interfaces at the same time, and the interface ID would be
+used to distinguish between them. This can be useful both for cases when
+different versions of an interface exist, or when completely different
+interfaces with different functionality are implemented)*.
+
+The bottomline is that a driver provider must generate a unique GUID for the
+driver, which is built into the driver code. This GUID is used in registering
+the driver with your system, usually as part of the driver installation process,
+and in creating a driver instance for use by an audio application.
