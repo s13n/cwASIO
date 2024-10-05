@@ -208,7 +208,7 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     n = wcslen(subkey);     // remember length so far for further appending
     //write the HKCR\CLSID\{---}\InprocServer32 default key, i.e. the path to the DLL
     HMODULE ownModule;
-    if(!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, &DllRegisterServer, &ownModule))
+    if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (wchar_t*)&DllRegisterServer, &ownModule))
         return HRESULT_FROM_WIN32(GetLastError());
     GetModuleFileNameW(ownModule, buffer, buffersize);
     wcscpy(subkey + n, L"\\InprocServer32");
