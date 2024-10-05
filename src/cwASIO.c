@@ -15,10 +15,12 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
+#   define NOMINMAX
+#   define WIN32_LEAN_AND_MEAN 
+#   include <Windows.h>
 #   include <combaseapi.h>
 #   include <guiddef.h>
 #   include <unknwnbase.h>
-#   include <winreg.h>
 #else
 #   include <alloca.h>
 #   include <dirent.h>
