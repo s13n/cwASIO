@@ -186,6 +186,11 @@ static DWORD sizeInChars(wchar_t const *string) {
     return (DWORD)(sizeof(wchar_t) * (wcslen(string)+1));
 }
 
+enum {
+    subkeysize = 256,   // should be enough for keys including the driver name
+    buffersize = 2048   // the maximum string size MS recommends in the registry for performance reasons
+};
+
 /** Put registration info into registry.
  * This function is called by installers, or by `regsvr32.exe`, to create the registry entries
  * required to enumerate the driver on Windows systems. It determines the path to the driver
@@ -193,14 +198,13 @@ static DWORD sizeInChars(wchar_t const *string) {
  * before loading the DLL and calling this function.
  */
 MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
-    enum {buffersize = 2048};   // the maximum string size MS recommends in the registry for performance reasons
     LSTATUS err = 0;
     //write the default value
     wchar_t buffer[buffersize];
     int n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverDescription, -1, buffer, buffersize);
     if(n <= 0)
         return HRESULT_FROM_WIN32(GetLastError());
-    wchar_t subkey[256] = L"CLSID\\";
+    wchar_t subkey[subkeysize] = L"CLSID\\";
     stringFromGUID(&cwAsioDriverCLSID, subkey + wcslen(subkey));    // append CLSID
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n));
     if (err)
@@ -210,21 +214,23 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     HMODULE ownModule;
     if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (wchar_t*)&DllRegisterServer, &ownModule))
         return HRESULT_FROM_WIN32(GetLastError());
-    GetModuleFileNameW(ownModule, buffer, buffersize);
+    DWORD res = GetModuleFileNameW(ownModule, buffer, buffersize);
+    if(res == 0 || res == buffersize)
+        return HRESULT_FROM_WIN32(GetLastError());
     wcscpy(subkey + n, L"\\InprocServer32");
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, sizeInChars(buffer));
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the HKCR\CLSID\{---}\InprocServer32\\ThreadingModel value
-    wchar_t thmod[] = L"Both";
-    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, L"ThreadingModel", REG_SZ, thmod, sizeInChars(thmod));
+    wcscpy(buffer, L"Both");
+    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, L"ThreadingModel", REG_SZ, buffer, sizeInChars(buffer));
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the "CLSID" entry data under HKLM\SOFTWARE\ASIO\<key>
     stringFromGUID(&cwAsioDriverCLSID, buffer);
     wcscpy(subkey, L"SOFTWARE\\ASIO\\");
     n = wcslen(subkey);     // remember length so far for appending
-    n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, 256 - n);      // append Key
+    n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, subkeysize - n);      // append Key
     if(n <= 0)
         return HRESULT_FROM_WIN32(GetLastError());
     err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", REG_SZ, buffer, sizeInChars(buffer));
@@ -244,9 +250,9 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
 MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
     LSTATUS err = 0;
     //remove the entire tree in HKLM\SOFTWARE\ASIO
-    wchar_t subkey[256] = L"SOFTWARE\\ASIO\\";
+    wchar_t subkey[subkeysize] = L"SOFTWARE\\ASIO\\";
     int n = wcslen(subkey);     // remember length so far for appending
-    MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, 256 - n);      // append Key
+    MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, subkeysize - n);      // append Key
     err = RegDeleteTreeW(HKEY_LOCAL_MACHINE, subkey);
     if (err)
         return HRESULT_FROM_WIN32(err);
