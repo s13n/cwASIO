@@ -9,6 +9,7 @@
  */
 
 #include "cwASIOdriver.h"
+#include <assert.h>
 #include <stdbool.h>
 
 #ifdef _WIN32
@@ -70,7 +71,8 @@ static cwASIOGUID const iidIClassFactory = {0x00000001,0x0000,0x0000,0xc0,0x00,0
     }
 #elif __GNUC__
     typedef int dll_use_count_t;
-    static int dllUseCount(bool increaseNotDecrease) {
+    static int dllUseCount = 0;
+    static int updateDllUseCount(bool increaseNotDecrease) {
         if (increaseNotDecrease)
             return __sync_add_and_fetch(&dllUseCount, 1);
         else
