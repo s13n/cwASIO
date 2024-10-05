@@ -176,7 +176,7 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllCanUnloadNow() {
 }
 
 static void stringFromGUID(cwASIOGUID const *guid, wchar_t *buffer) {
-    swprintf(buffer, 37, L"{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}"
+    swprintf(buffer, 39, L"{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}"
         , guid->Data1, guid->Data2, guid->Data3
         , guid->Data4[0], guid->Data4[1], guid->Data4[2], guid->Data4[3]
         , guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7]);
@@ -202,7 +202,7 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
         return HRESULT_FROM_WIN32(GetLastError());
     wchar_t subkey[256] = L"CLSID\\";
     stringFromGUID(&cwAsioDriverCLSID, subkey + wcslen(subkey));    // append CLSID
-    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * (n+1)));
+    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n)));
     if (err)
         return HRESULT_FROM_WIN32(err);
     n = wcslen(subkey);     // remember length so far for further appending
@@ -224,8 +224,8 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     stringFromGUID(&cwAsioDriverCLSID, buffer);
     wcscpy(subkey, L"SOFTWARE\\ASIO\\");
     n = wcslen(subkey);     // remember length so far for appending
-    n += MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, buffer + n, buffersize - n);      // append Key
-    err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * (n+1)));
+    n += MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, 256 - n);      // append Key
+    err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", REG_SZ, buffer, sizeInChars(buffer));
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the "Description" entry data under HKLM\SOFTWARE\ASIO\<key>
