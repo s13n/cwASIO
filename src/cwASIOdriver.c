@@ -202,7 +202,7 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
         return HRESULT_FROM_WIN32(GetLastError());
     wchar_t subkey[256] = L"CLSID\\";
     stringFromGUID(&cwAsioDriverCLSID, subkey + wcslen(subkey));    // append CLSID
-    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n)));
+    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n));
     if (err)
         return HRESULT_FROM_WIN32(err);
     n = wcslen(subkey);     // remember length so far for further appending
@@ -224,12 +224,16 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     stringFromGUID(&cwAsioDriverCLSID, buffer);
     wcscpy(subkey, L"SOFTWARE\\ASIO\\");
     n = wcslen(subkey);     // remember length so far for appending
-    n += MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, 256 - n);      // append Key
+    n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, 256 - n);      // append Key
+    if(n <= 0)
+        return HRESULT_FROM_WIN32(GetLastError());
     err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", REG_SZ, buffer, sizeInChars(buffer));
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the "Description" entry data under HKLM\SOFTWARE\ASIO\<key>
     n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverDescription, -1, buffer, buffersize);
+    if(n <= 0)
+        return HRESULT_FROM_WIN32(GetLastError());
     err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"Description", REG_SZ, buffer, sizeInChars(buffer));
     return HRESULT_FROM_WIN32(err);
 }
