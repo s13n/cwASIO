@@ -61,15 +61,8 @@ static wchar_t *fromUTF8(char const *str) {
 
 long cwASIOload(char const *key, struct cwASIODriver **drv) {
     CLSID id = cwASIOtoGUID(key);
-    IClassFactory *factory = NULL;
-    HRESULT res = CoGetClassObject(&id, CLSCTX_INPROC_SERVER, NULL, &IID_IClassFactory, &factory);
-    if (FAILED(res))
-        return res;
-    if (!factory || !factory->lpVtbl)
-        return ASE_NotPresent;
-
-    res = factory->lpVtbl->CreateInstance(factory, NULL, &id, drv);
-    factory->lpVtbl->Release(factory);
+    // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
+    HRESULT res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, drv);
     if (FAILED(res))
         return res;
     return 0;
