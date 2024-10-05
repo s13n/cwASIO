@@ -137,11 +137,7 @@ static long CWASIO_METHOD createInstance(struct ClassFactory *f, struct IUnknown
 }
 
 static long CWASIO_METHOD lockServer(struct ClassFactory *f, int flock) {
-    if (flock)
-        updateDllUseCount(true);
-    else
-        updateDllUseCount(false);
-
+    updateDllUseCount(flock != 0);
     return 0L;
 }
 
@@ -179,8 +175,6 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllCanUnloadNow() {
     return dllUseCount <= 0 ? S_OK : S_FALSE;
 }
 
-static HMODULE ownModule = NULL;
-
 static void stringFromGUID(cwASIOGUID const *guid, wchar_t *buffer) {
     swprintf(buffer, 37, L"{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}"
         , guid->Data1, guid->Data2, guid->Data3
@@ -213,6 +207,9 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
         return HRESULT_FROM_WIN32(err);
     n = wcslen(subkey);     // remember length so far for further appending
     //write the HKCR\CLSID\{---}\InprocServer32 default key, i.e. the path to the DLL
+    HMODULE ownModule;
+    if(!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, &DllRegisterServer, &ownModule))
+        return HRESULT_FROM_WIN32(GetLastError());
     GetModuleFileNameW(ownModule, buffer, buffersize);
     wcscpy(subkey + n, L"\\InprocServer32");
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, sizeInChars(buffer));
@@ -254,33 +251,6 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
     stringFromGUID(&cwAsioDriverCLSID, subkey + wcslen(subkey));    // append CLSID
     err = RegDeleteTreeW(HKEY_CLASSES_ROOT, subkey);
     return HRESULT_FROM_WIN32(err);
-}
-
-MODULE_EXPORT BOOL CWASIO_METHOD DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
-    switch (reason) {
-    case DLL_PROCESS_ATTACH:        // Initialize once for each new process.
-        if (reserved)
-            return FALSE;           // We don't support static load!
-        else
-            ownModule = hinst;
-        break;
-
-    case DLL_THREAD_ATTACH:         // Do thread-specific initialization.
-        break;
-
-    case DLL_THREAD_DETACH:         // Do thread-specific cleanup.
-        break;
-
-    case DLL_PROCESS_DETACH:
-        ownModule = NULL;
-        if (reserved != NULL) {
-            break; // do not do cleanup if process termination scenario
-        }
-
-        // Perform any necessary cleanup.
-        break;
-    }
-    return TRUE;  // Successful DLL_PROCESS_ATTACH.
 }
 
 #else // not _WIN32
