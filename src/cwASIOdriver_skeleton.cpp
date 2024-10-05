@@ -16,12 +16,9 @@ extern "C" {
 
 
 // Initialize the following data constants with the values for your driver.
-static cwASIOGUID const ourGuid = {};
-cwASIOGUID const cwAsioDriverCLSID = {};
-cwASIOGUID const cwAsioDriverLibID = {};
+cwASIOGUID const cwAsioDriverCLSID = {/*0x________,0x____,0x____,0x__,0x__,0x__,0x__,0x__,0x__,0x__,0x__*/};
 char const *cwAsioDriverKey = "";
 char const *cwAsioDriverDescription = "";
-wchar_t const *cwAsioDriverProgID = L"";
 
 atomic_uint activeInstances = 0;
 
@@ -37,7 +34,7 @@ struct MyAsioDriver : cwASIODriver {
     }
 
     long queryInterface(cwASIOGUID const *guid, void **ptr) {
-        if (!cwASIOcompareGUID(guid, &ourGuid)) {
+        if (!cwASIOcompareGUID(guid, &cwAsioDriverCLSID)) {
             *ptr = nullptr;
             return E_NOINTERFACE;
         }

@@ -221,7 +221,7 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the "CLSID" entry data under HKLM\SOFTWARE\ASIO\<key>
-    stringFromGUID(&cwAsioDriverLibID, buffer);
+    stringFromGUID(&cwAsioDriverCLSID, buffer);
     wcscpy(subkey, L"SOFTWARE\\ASIO\\");
     n = wcslen(subkey);     // remember length so far for appending
     n += MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, buffer + n, buffersize - n);      // append Key

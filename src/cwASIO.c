@@ -160,8 +160,8 @@ typedef long (CWASIO_METHOD DllGetClassObject)(cwASIOGUID const *, cwASIOGUID co
 
 static cwASIOGUID const IID_IClassFactory = {0x00000001, 0x0000, 0x0000, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46};
 
-long cwASIOload(char const *path, struct cwASIODriver **drv) {
-    void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
+long cwASIOload(char const *id, struct cwASIODriver **drv) {
+    void *lib = dlopen(id, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
         return ASE_NotPresent;
 
@@ -179,6 +179,11 @@ long cwASIOload(char const *path, struct cwASIODriver **drv) {
     err = factory->lpVtbl->CreateInstance(factory, NULL, NULL, (void**)drv);
 
     return err ? ASE_OK : ASE_NotPresent;
+}
+
+void cwASIOunload(struct cwASIODriver *drv) {
+    if(drv)
+        drv->lpVtbl->Release(drv);
 }
 
 static char *cwASIOreadConfig(char const *base, char const *name, char const *file) {
@@ -257,11 +262,6 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
 }
 
 #endif
-
-void cwASIOunload(struct cwASIODriver *drv) {
-    if(drv)
-        drv->lpVtbl->Release(drv);
-}
 
 bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b) {
     return a && b ? 0 == memcmp(a, b, sizeof(cwASIOGUID)) : a == b;

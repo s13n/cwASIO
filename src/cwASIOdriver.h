@@ -42,12 +42,6 @@ struct _GUID {
  */
 extern cwASIOGUID const cwAsioDriverCLSID;
 
-/** The Library GUID of the driver.
- * This is a GUID that identifies the driver DLL, and thus is driver specific. The driver implementer
- * must provide the definition.
- */
-extern cwASIOGUID const cwAsioDriverLibID;
-
 /** The key string (UTF-8) for the driver.
  * This will be used in driver registration. Keep its length reasonable.
  */
