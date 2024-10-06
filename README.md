@@ -234,6 +234,93 @@ also makes writing portable applications easier, since the API is the same
 everywhere. Furthermore, the native API allows a host application to have
 more than one driver loaded and used at the same time, if so desired.
 
+## Multi-instance issues
+
+The original ASIO API was designed around the idea that there is only a single
+instance in a process. This shows in various places, and is difficult to
+overcome. Multi-instance issues present themselves in the following ways:
+
+### Multiclient drivers
+
+This is the ability of a driver to accommodate several concurrent host
+applications. ASIO does support this, and drivers can be readily written that
+work in this way.
+
+For the driver writer, this means that the driver module (DLL or shared object)
+can be loaded concurrently by several processes, each of which will call
+`init()` on its interface. Since the hardware only exists once, the driver will
+have to keep track of the number of applications using it, and only initialize
+the hardware when the first application calls `init()`, and deinitialize it when
+the last one disappears. It will also have to manage conflicts when applications
+want to set the sampling rate, or other parameters, that would affect all host
+applications.
+
+It goes without saying that common data structures will have to be protected
+from concurrent access by different applications.
+
+### Multidriver applications
+
+This is the ability of an application to open more than one ASIO driver
+simultaneously. ASIO can support this, but not with the standard C API. The
+driver API (in cwASIO represented by cwASIODriverVtbl) needs to be used
+directly.
+
+The callbacks of the driver API present an additional difficulty here. They lack
+a context parameter that would permit to distinguish between the drivers, so the
+application must use some trickery to identify the driver that called one of the
+callbacks.
+
+### Multiinstance drivers
+
+This is the ability of a single driver to be instantiated multiple times for
+different audio hardware. For example, think about two devices that are managed
+by the same driver connected to the same computer. This can't be done with
+standard ASIO. The workaround used by some manufacturers is to load the driver
+once, and it takes care of all the connected hardware devices, effectively
+making them look as if they were one combined device. This only makes sense when
+the devices are synchronized between each other, i.e. they work from a common
+clock, and share the same settings.
+
+Loading the same driver separately for each of the devices, with individual
+settings for them, is hampered by the difficulty to enumerate and identify the
+different instances of the same driver. In theory, on Windows, there could be
+multiple entries under the `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` registry key, one
+for each hardware device, all using the same CLSID that leads to the same
+driver, i.e. to the same entry under the `HKEY_CLASSES_ROOT\CLSID` registry key.
+But the driver would need to know which of the several hardware devices it is
+supposed to take care of. Some additional information would need to be passed to
+the driver instance for allowing it to make that distinction, but ASIO doesn't
+define a mechanism for doing that.
+
+An extension to ASIO is defined by cwASIO to make this possible:
+
+The `future()` method of the driver implements a new selector that allows
+passing the name of the subkey in `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` mentioned
+above. The call would need to be made before the call to `init()`, which is
+implemented for the standard ASIO C API when you use the `ASIOLoad()` function
+of cwASIO. A driver that doesn't implement this, which includes all legacy
+drivers, would not understand this call and return an error code of
+`ASE_InvalidParameter`. When `ASIOLoad()` returns this, the driver has been
+successfully loaded, but doesn't offer multiinstance support.
+
+A driver that understands the new selector would store the name passed. The
+subsequent `init()` call would use the stored name to distinguish between
+different hardware devices, and to locate any further information specific to
+the hardware device in the registry. If no `future()` call was made before
+calling `init()`, no name is known, and the driver has to make an intelligent
+choice by itself.
+
+Calling `future()` with the new selector `kcwASIOsetInstanceName` will be
+answered with `ASE_InvalidParameter` by a driver that offers no multiinstance
+support. A driver that offers this support should verify that an entry with the
+given name is present in the registry, in which case it returns `ASE_SUCCESS`.
+If no matching registry entry was found, the return value is `ASE_NotPresent`.
+Note that only the presence of the registry entry should be checked, not the
+presence of the hardware device itself. Providing an empty name string (or NULL)
+to the `future()` call should have no effect and return `ASE_SUCCESS` if the
+driver offers multiinstance support. This may be used to check for multiinstance
+support without setting a name.
+
 ## Writing a driver
 
 cwASIO includes two code skeletons that you can use as a starting point for your

@@ -265,7 +265,10 @@ enum cwASIOFutureSel {
     // Extension for drop out detection
     kAsioCanReportOverload = 0x24042012,    //!< return `ASE_SUCCESS` if driver can detect and report overloads
 
-    kAsioGetInternalBufferSamples = 0x25042012  //!< cwASIOInternalBufferInfo * in params. Deliver size of driver internal buffering, return `ASE_SUCCESS` if supported
+    kAsioGetInternalBufferSamples = 0x25042012,  //!< cwASIOInternalBufferInfo * in params. Deliver size of driver internal buffering, return `ASE_SUCCESS` if supported
+
+    // cwASIO extensions
+    kcwASIOsetInstanceName = 0x7F000001   //!< char const * to name in params
 };
 
 struct cwASIOInputMonitor {

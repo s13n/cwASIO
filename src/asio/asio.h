@@ -38,10 +38,11 @@ typedef struct cwASIOInternalBufferInfo ASIOInternalBufferInfo;
 * you need to use ASIOLoad() to load the driver, instead of using cwASIOload().
 * This causes a reference to the driver being remembered in a global variable
 * behind the scenes.
-* @param key A system-specific textual key that identifies the driver to load.
+* @param id The id string that was obtained through enumeration.
+* @param name The name string that was obtained through enumeration
 * @return an error code, which is zero on success.
 */
-ASIOError ASIOLoad(char const *key);
+ASIOError ASIOLoad(char const *id, char const *name);
 
 /** Unload the driver and disable the below functions.
 * @return an error code, which is zero on success.

@@ -15,10 +15,16 @@
 
 static struct cwASIODriver *theAsioDriver = NULL;
 
-ASIOError ASIOLoad(char const *path) {
+ASIOError ASIOLoad(char const *id, char const *name) {
     if(theAsioDriver)
         return ASE_NoMemory;
-    return cwASIOload(path, &theAsioDriver);
+    ASIOError err = cwASIOload(id, &theAsioDriver);
+    if(err != ASE_OK && err != ASE_SUCCESS) {
+        theAsioDriver = NULL;
+        return err;
+    }
+    err = theAsioDriver->lpVtbl->future(theAsioDriver, kcwASIOsetInstanceName, (void *)name);
+    return err == ASE_SUCCESS ? ASE_OK : err;
 }
 
 ASIOError ASIOUnload(void) {
