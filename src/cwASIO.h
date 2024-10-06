@@ -73,10 +73,19 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context);
  * Only UTF-8 text is supported as the data type, so other types of data must be serialized.
  * On Windows, the data type used is the string value, which is stored in UTF-16. This is
  * converted to UTF-8 while copying the value into the buffer.
- * @param name The name of the instance
- * @param key The key of the parameter
- * @param buffer The address of the buffer to copy the parameter into
- * @param size The size of the buffer
+ * 
+ * Passing the name only, and passing NULL/zero for the other arguments, can be used to check
+ * if there is registration info for the given instance name, i.e. if that name is registered.
+ * If it is, zero is returned, otherwise a negative error code is returned.
+ * 
+ * Passing a name and a key, but passing NULL/zero for the buffer and its size, can be used
+ * to check if a certain value exists in the registry, without returning its content. The
+ * return value is 0 if it exists, and a negative error value if it doesn't.
+ * 
+ * @param name The name of the instance.
+ * @param key The key of the parameter. May be NULL to check presence of instance key/folder.
+ * @param buffer The address of the buffer to copy the parameter into. May be NULL if size is zero.
+ * @param size The size of the buffer. Must be 0 if NULL is passed to buffer.
  * @return The number of characters copied into the buffer, including the terminating NUL, or a negative error value.
  */
 int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size);
