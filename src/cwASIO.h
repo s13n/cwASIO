@@ -22,9 +22,9 @@ typedef struct _GUID cwASIOGUID;
 struct cwASIODriver;
 
 struct cwASIODriverVtbl {
-    long (CWASIO_METHOD *QueryInterface)(struct cwASIODriver *, cwASIOGUID const *, void **);
-    unsigned long (CWASIO_METHOD *AddRef)(struct cwASIODriver *);
-    unsigned long (CWASIO_METHOD *Release)(struct cwASIODriver *);
+    long (CWASIO_METHOD *queryInterface)(struct cwASIODriver *, cwASIOGUID const *, void **);
+    unsigned long (CWASIO_METHOD *addRef)(struct cwASIODriver *);
+    unsigned long (CWASIO_METHOD *release)(struct cwASIODriver *);
     cwASIOBool (CWASIO_METHOD *init)(struct cwASIODriver *, void *);
     void (CWASIO_METHOD *getDriverName)(struct cwASIODriver *, char *);
     long (CWASIO_METHOD *getDriverVersion)(struct cwASIODriver *);

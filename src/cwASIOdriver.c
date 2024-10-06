@@ -122,13 +122,13 @@ static long CWASIO_METHOD createInstance(struct ClassFactory *f, struct IUnknown
 
     // Let cwAsioDriver's QueryInterface check the GUID and set the pointer.
     // It also increments the reference count (to 2) if all goes well.
-    hr = obj->lpVtbl->QueryInterface(obj, guid, ppv);
+    hr = obj->lpVtbl->queryInterface(obj, guid, ppv);
 
     // NOTE: If there was an error in QueryInterface(), then Release() will be decrementing
     // the count back to 0 and will delete the instance for us. One error that may occur is
     // that the caller is asking for some sort of object that we don't support (i.e. it's a
     // GUID we don't recognize).
-    obj->lpVtbl->Release(obj);
+    obj->lpVtbl->release(obj);
 
     if (!hr)
         updateDllUseCount(true);

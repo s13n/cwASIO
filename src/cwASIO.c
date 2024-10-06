@@ -190,7 +190,7 @@ long cwASIOload(char const *id, struct cwASIODriver **drv) {
 
 void cwASIOunload(struct cwASIODriver *drv) {
     if(drv)
-        drv->lpVtbl->Release(drv);
+        drv->lpVtbl->release(drv);
 }
 
 static char *cwASIOreadConfig(char const *base, char const *name, char const *file) {
