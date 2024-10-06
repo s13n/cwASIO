@@ -67,6 +67,20 @@ typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
  */
 int cwASIOenumerate(cwASIOcallback *cb, void *context);
 
+/** Read a parameter from the registry.
+ * On Windows, this accesses the subkeys within `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO\<name>`.
+ * On Linux, this accesses the files within `/etc/cwASIO/<name>`.
+ * Only UTF-8 text is supported as the data type, so other types of data must be serialized.
+ * On Windows, the data type used is the string value, which is stored in UTF-16. This is
+ * converted to UTF-8 while copying the value into the buffer.
+ * @param name The name of the instance
+ * @param key The key of the parameter
+ * @param buffer The address of the buffer to copy the parameter into
+ * @param size The size of the buffer
+ * @return The number of characters copied into the buffer, including the terminating NUL, or a negative error value.
+ */
+int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size);
+
 /** Load the driver.
  * @param id On Windows: the CLSID, on Linux: the file path of the driver to load.
  * @param drv Receives a pointer to the driver instance.

@@ -139,6 +139,30 @@ close_hkey:
     return err;
 }
 
+int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size) {
+    enum {subkeysize = 256, buffersize=2048};
+    wchar_t subkey[subkeysize] = L"SOFTWARE\\ASIO\\";
+    int n = wcslen(subkey);     // remember length so far for appending
+    n = MultiByteToWideChar(CP_UTF8, 0, name, -1, subkey + n, subkeysize - n);      // append name
+    if(n <= 0)
+        return -(int)GetLastError();
+    wchar_t *value = fromUTF8(key);
+    if(!value)
+        return -(int)GetLastError();
+    wchar_t buf[buffersize];
+    DWORD bufsize = buffersize;
+    LSTATUS err = RegGetValueW(HKEY_LOCAL_MACHINE, subkey, value, RRF_RT_REG_SZ, NULL, buf, &bufsize);
+    if (err) {
+        free(value);
+        return err;
+    }
+    n = WideCharToMultiByte(CP_UTF8, 0, buf, bufsize, buffer, size, NULL, NULL);
+    free(value);
+    if(n == 0)
+        return -(int)GetLastError();
+    return n < (int)size ? n : (int)size;
+}
+
 #else
 
 struct _GUID {
