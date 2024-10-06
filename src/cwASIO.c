@@ -72,7 +72,7 @@ long cwASIOload(char const *key, struct cwASIODriver **drv) {
 
 void cwASIOunload(struct cwASIODriver *drv) {
     if(drv)
-        drv->lpVtbl->Release(drv);
+        drv->lpVtbl->release(drv);
 }
 
 static LSTATUS getValue(HKEY hkey, wchar_t *subKey, wchar_t *name, wchar_t **val, DWORD *len) {

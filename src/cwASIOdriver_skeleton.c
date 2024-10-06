@@ -32,7 +32,7 @@ static long CWASIO_METHOD queryInterface(struct cwASIODriver *drv, cwASIOGUID co
     }
     // It's our GUID
     *ptr = drv;
-    drv->lpVtbl->AddRef(drv);
+    drv->lpVtbl->addRef(drv);
     return 0;       // success
 }
 
@@ -178,9 +178,9 @@ static cwASIOError CWASIO_METHOD outputReady(struct cwASIODriver *drv) {
 }
 
 struct cwASIODriverVtbl const myAsioDriverVtbl = {
-    .QueryInterface = &queryInterface,
-    .AddRef = &addRef,
-    .Release = &release,
+    .queryInterface = &queryInterface,
+    .addRef = &addRef,
+    .release = &release,
     .init = &init,
     .getDriverName = &getDriverName,
     .getDriverVersion = &getDriverVersion,
