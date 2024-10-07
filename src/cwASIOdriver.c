@@ -13,6 +13,7 @@
 #include <stdbool.h>
 
 #ifdef _WIN32
+#   include <windows.h>
 #   include <olectl.h>
 #   include <unknwnbase.h>
 #   include <wchar.h>
@@ -23,6 +24,7 @@
 #   include <dlfcn.h>
 #   include <errno.h>
 #   include <fcntl.h>
+#   include <link.h>
 #   include <stdio.h>
 #   include <string.h>
 #   include <time.h>
@@ -32,10 +34,16 @@
 #   define MODULE_EXPORT __attribute__((visibility("protected")))
 #endif
 
+#ifndef __STDC_NO_ATOMICS__
+#include <stdatomic.h>
+#endif
+
 /** This file provides the scaffolding for implementing a cwASIO driver that can be loaded by a host application.
 * The scaffolding arranges for object instantiation, discovery and installation. The driver functionality must
 * be implemented elsewhere (see the provided skeleton files).
-* 
+*/
+
+#ifdef _WIN32
 * On Windows, this scaffolding includes a COM compliant class factory, and a few functions that are exported
 * from the DLL, as defined in `cwASIOdriver.def`.
 * 
@@ -60,27 +68,14 @@ struct ClassFactory {
 static cwASIOGUID const iidIUnknown      = {0x00000000,0x0000,0x0000,0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46};
 static cwASIOGUID const iidIClassFactory = {0x00000001,0x0000,0x0000,0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46};
 
-#ifdef _WIN32
-    typedef LONG dll_use_count_t;
-    static LONG dllUseCount = 0;
-    static dll_use_count_t updateDllUseCount(bool increaseNotDecrease) {
-        if (increaseNotDecrease)
-            return InterlockedIncrement(&dllUseCount);
-        else
-            return InterlockedDecrement(&dllUseCount);
-    }
-#elif __GNUC__
-    typedef int dll_use_count_t;
-    static int dllUseCount = 0;
-    static int updateDllUseCount(bool increaseNotDecrease) {
-        if (increaseNotDecrease)
-            return __sync_add_and_fetch(&dllUseCount, 1);
-        else
-            return __sync_sub_and_fetch(&dllUseCount, 1);
-    }
-#else
-    #error unsupported compiler
-#endif
+typedef LONG dll_use_count_t;
+static LONG dllUseCount = 0;
+static dll_use_count_t updateDllUseCount(bool increaseNotDecrease) {
+    if (increaseNotDecrease)
+        return InterlockedIncrement(&dllUseCount);
+    else
+        return InterlockedDecrement(&dllUseCount);
+}
 
 static long CWASIO_METHOD queryInterface(struct ClassFactory *self, cwASIOGUID const *guid, void **ppv) {
     // Check if the GUID matches an IClassFactory or IUnknown IID.
@@ -150,8 +145,6 @@ static struct ClassFactoryVtbl driverFactoryVtbl = {
 };
 
 static struct ClassFactory driverFactory = { &driverFactoryVtbl };
-
-#ifdef _WIN32
 
 MODULE_EXPORT HRESULT CWASIO_METHOD DllGetClassObject(cwASIOGUID const *objGuid, cwASIOGUID const *factoryGuid, void **factoryHandle) {
     // Check that the caller is passing our GUID. That's the COM object our DLL implements.
@@ -264,6 +257,60 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
 }
 
 #else // not _WIN32
+
+// we assume clang or gcc here, or any other compiler whose atomics builtins are compatible
+typedef int dll_use_count_t;
+static int libUseCount = 0;
+static int updateUseCount(bool increaseNotDecrease) {
+    if (increaseNotDecrease)
+        return __sync_add_and_fetch(&libUseCount, 1);
+    else
+        return __sync_sub_and_fetch(&libUseCount, 1);
+}
+
+MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
+    // Create our instance.
+    struct cwASIODriver *obj = makeAsioDriver();
+    if (!obj)
+        return NULL;
+
+    void *ifc;
+    // Let cwAsioDriver's QueryInterface check the GUID and set the pointer.
+    // It also increments the reference count (to 2) if all goes well.
+    long hr = obj->lpVtbl->queryInterface(obj, guid, &ifc);
+
+    // NOTE: If there was an error in QueryInterface(), then Release() will be decrementing
+    // the count back to 0 and will delete the instance for us. One error that may occur is
+    // that the caller is asking for some sort of object that we don't support (i.e. it's a
+    // GUID we don't recognize).
+    obj->lpVtbl->release(obj);
+
+    if (hr == 0)
+        updateUseCount(true);
+
+    return NULL;
+}
+
+static void *getLibraryHandle(void) {    
+    // We iterate through the link_map list of the process until we find the address of our own object.
+    // On Linux, the address of the link_map is the handle returned by dlopen.
+    Dl_info info;
+    if (dladdr(&instantiateDriver, &info)) {
+        struct link_map *l;
+        dlinfo(dlopen(NULL, RTLD_LAZY), RTLD_DI_LINKMAP, &l);
+        while (l) {
+            if (l->l_addr == (intptr_t)info.dli_fbase)
+                return l;
+            l = l->l_next;
+        }
+    }
+    return NULL;
+}
+
+MODULE_EXPORT void releaseDriver(void) {
+    void *handle = getLibraryHandle();
+    dlclose(handle);
+}
 
 /** Put registration info into /etc/cwASIO.
  *
