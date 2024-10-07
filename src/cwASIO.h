@@ -11,11 +11,19 @@
 
 #include "cwASIOtypes.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef _WIN32
 #   define CWASIO_METHOD __stdcall     // only relevant in 32-bit Windows
 #else
 #   define CWASIO_METHOD
+
+struct _GUID {
+    uint32_t Data1;
+    uint16_t Data2;
+    uint16_t Data3;
+    uint8_t  Data4[8];
+};
 #endif
 
 typedef struct _GUID cwASIOGUID;

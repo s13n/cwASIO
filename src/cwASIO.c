@@ -173,51 +173,21 @@ int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned
 
 #else
 
-struct _GUID {
-    uint32_t Data1;
-    uint16_t Data2;
-    uint16_t Data3;
-    uint8_t  Data4[8];
-};
-
-struct IUnknown;
-struct ClassFactory;
-
-struct ClassFactoryVtbl {
-    long (CWASIO_METHOD *QueryInterface)(struct ClassFactory *, cwASIOGUID const *, void **);
-    unsigned long (CWASIO_METHOD *AddRef)(struct ClassFactory *);
-    unsigned long (CWASIO_METHOD *Release)(struct ClassFactory *);
-    long (CWASIO_METHOD *CreateInstance)(struct ClassFactory *, struct IUnknown *, cwASIOGUID const *, void **);
-    long (CWASIO_METHOD *LockServer)(struct ClassFactory *, int);
-};
-
-struct ClassFactory {
-    struct ClassFactoryVtbl const *lpVtbl;
-};
-
-typedef long (CWASIO_METHOD DllGetClassObject)(cwASIOGUID const *, cwASIOGUID const *, void **);
-
-static cwASIOGUID const IID_IClassFactory = {0x00000001, 0x0000, 0x0000, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46};
+typedef struct cwASIODriver * (CWASIO_METHOD InstantiateDriver)(cwASIOGUID const *);
 
 long cwASIOload(char const *id, struct cwASIODriver **drv) {
     void *lib = dlopen(id, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
         return ASE_NotPresent;
 
-    DllGetClassObject *getClassObject = dlsym(lib, "DllGetClassObject");
-    if (!getClassObject)
-        return ASE_NotPresent;
-
-    struct ClassFactory *factory = NULL;
-    // Under Linux, we pass a NULL for the class ID; we don't need to check it.
-    long err = getClassObject(NULL, &IID_IClassFactory, (void**)&factory);
-    if (!factory)
+    InstantiateDriver *instantiateDriver = dlsym(lib, "instantiateDriver");
+    if (!instantiateDriver)
         return ASE_NotPresent;
 
     // Under Linux, we pass a NULL for the interface ID; we don't need to check it.
-    err = factory->lpVtbl->CreateInstance(factory, NULL, NULL, (void**)drv);
+    *drv = instantiateDriver(NULL);
 
-    return err ? ASE_OK : ASE_NotPresent;
+    return *drv ? ASE_OK : ASE_NotPresent;
 }
 
 void cwASIOunload(struct cwASIODriver *drv) {

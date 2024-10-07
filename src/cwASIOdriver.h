@@ -26,14 +26,6 @@ enum {
     CLASS_E_CLASSNOTAVAILABLE = ENOPROTOOPT,
     CLASS_E_NOAGGREGATION = EOPNOTSUPP
 };
-
-struct _GUID {
-    unsigned long  Data1;
-    unsigned short Data2;
-    unsigned short Data3;
-    unsigned char  Data4[8];
-};
-
 #endif
 
 /** The COM class GUID of the driver.
