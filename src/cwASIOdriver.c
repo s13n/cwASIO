@@ -44,11 +44,9 @@
 */
 
 #ifdef _WIN32
-* On Windows, this scaffolding includes a COM compliant class factory, and a few functions that are exported
-* from the DLL, as defined in `cwASIOdriver.def`.
-* 
-* On Linux TBD
-*/
+/* On Windows, this scaffolding includes a COM compliant class factory, and a few functions that are exported
+ * from the DLL, as defined in `cwASIOdriver.def`.
+ */ 
 
 struct IUnknown;
 struct ClassFactory;
@@ -257,6 +255,9 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
 }
 
 #else // not _WIN32
+
+/* On Linux TBD
+ */
 
 // we assume clang or gcc here, or any other compiler whose atomics builtins are compatible
 typedef int dll_use_count_t;
