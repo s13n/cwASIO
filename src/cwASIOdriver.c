@@ -31,11 +31,7 @@
 #   include <unistd.h>
 #   include <sys/stat.h>
 
-#   define MODULE_EXPORT __attribute__((visibility("protected")))
-#endif
-
-#ifndef __STDC_NO_ATOMICS__
-#include <stdatomic.h>
+#   define MODULE_EXPORT __attribute__((visibility("default")))
 #endif
 
 /** This file provides the scaffolding for implementing a cwASIO driver that can be loaded by a host application.
@@ -387,7 +383,7 @@ MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
 }
 
 MODULE_EXPORT void releaseDriver(struct cwASIODriver *) {
-    if(0 == updateUseCount(false) {
+    if(0 == updateUseCount(false)) {
         void *handle = getLibraryHandle();
         dlclose(handle);
     }
