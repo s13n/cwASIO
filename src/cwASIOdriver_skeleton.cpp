@@ -20,12 +20,12 @@ cwASIOGUID const cwAsioDriverCLSID = {/*0x________,0x____,0x____,0x__,0x__,0x__,
 char const *cwAsioDriverKey = "";
 char const *cwAsioDriverDescription = "";
 
-atomic_uint activeInstances = 0;
 
-
-struct MyAsioDriver : cwASIODriver {
+/** Your driver implemented as a C++ class. */
+class MyAsioDriver : public cwASIODriver {
     MyAsioDriver(MyAsioDriver &&) =delete;  // no move/copy
 
+public:
     MyAsioDriver()
         : cwASIODriver{ &vtbl }
         , references{0}

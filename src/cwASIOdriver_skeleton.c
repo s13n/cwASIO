@@ -8,17 +8,18 @@
 #pragma once
 
 #include "cwASIOdriver.h"
+#include <stdatomic.h>
+#include <stddef.h>
 // ... (add here any further includes you may need)
 
 
 // Initialize the following data constants with the values for your driver.
-cwASIOGUID const cwAsioDriverCLSID = {0};
+cwASIOGUID const cwAsioDriverCLSID = {0x00000000,0x0000,0x0000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 char const *cwAsioDriverKey = "";
 char const *cwAsioDriverDescription = "";
 
-atomic_uint activeInstances = 0;
 
-
+/** Your driver implemented as a C struct. */
 struct MyAsioDriver {
     struct cwASIODriver base;   // must be the first struct member
     atomic_ulong references;    // threadsafe reference counter

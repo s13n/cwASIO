@@ -45,13 +45,14 @@ extern char const *cwAsioDriverKey;
 extern char const *cwAsioDriverDescription;
 
 /** Make an instance of the driver.
- * Implement this function to create an instance of the driver object and return a pointer to it.
+ * This function must be implemented by the driver to create an instance of the driver object and
+ * return a pointer to it.
  * 
  * Most of the initialization will happen when the `init()` method of the driver instance is called,
  * so what you need to do here is to allocate the driver object, and initialize the pointer to its
  * virtual function table (`cwASIODriverVtbl`). The virtual function table itself must also be
  * initialized with pointers to all the methods declared in `cwASIODriverVtbl`, i.e. you must
- * implement those methods, too. For details, see below.
+ * implement those methods, too. For details, see the provided skeleton files.
  * 
  * @return Pointer to the new driver instance, or NULL on error.
  */

@@ -37,9 +37,6 @@ add_library(cwASIO::driver ALIAS cwASIO_driver)
 target_sources(cwASIO_driver PRIVATE cwASIOtypes.h cwASIO.h cwASIO.c cwASIOdriver.h cwASIOdriver.c cwASIOdriver.def)
 target_include_directories(cwASIO_driver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(cwASIO_driver PUBLIC c_std_11)
-target_compile_options(cwASIO_driver
-    PUBLIC $<$<C_COMPILER_ID:MSVC>:/experimental:c11atomics>
-)
 
 # Define C++ wrapper as an interface library
 add_library(cwASIO_libxx INTERFACE cwASIO.hpp)

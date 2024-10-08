@@ -259,60 +259,6 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
 /* On Linux TBD
  */
 
-// we assume clang or gcc here, or any other compiler whose atomics builtins are compatible
-typedef int dll_use_count_t;
-static int libUseCount = 0;
-static int updateUseCount(bool increaseNotDecrease) {
-    if (increaseNotDecrease)
-        return __sync_add_and_fetch(&libUseCount, 1);
-    else
-        return __sync_sub_and_fetch(&libUseCount, 1);
-}
-
-MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
-    // Create our instance.
-    struct cwASIODriver *obj = makeAsioDriver();
-    if (!obj)
-        return NULL;
-
-    void *ifc;
-    // Let cwAsioDriver's QueryInterface check the GUID and set the pointer.
-    // It also increments the reference count (to 2) if all goes well.
-    long hr = obj->lpVtbl->queryInterface(obj, guid, &ifc);
-
-    // NOTE: If there was an error in QueryInterface(), then Release() will be decrementing
-    // the count back to 0 and will delete the instance for us. One error that may occur is
-    // that the caller is asking for some sort of object that we don't support (i.e. it's a
-    // GUID we don't recognize).
-    obj->lpVtbl->release(obj);
-
-    if (hr == 0)
-        updateUseCount(true);
-
-    return NULL;
-}
-
-static void *getLibraryHandle(void) {    
-    // We iterate through the link_map list of the process until we find the address of our own object.
-    // On Linux, the address of the link_map is the handle returned by dlopen.
-    Dl_info info;
-    if (dladdr(&instantiateDriver, &info)) {
-        struct link_map *l;
-        dlinfo(dlopen(NULL, RTLD_LAZY), RTLD_DI_LINKMAP, &l);
-        while (l) {
-            if (l->l_addr == (intptr_t)info.dli_fbase)
-                return l;
-            l = l->l_next;
-        }
-    }
-    return NULL;
-}
-
-MODULE_EXPORT void releaseDriver(void) {
-    void *handle = getLibraryHandle();
-    dlclose(handle);
-}
-
 /** Put registration info into /etc/cwASIO.
  *
  * This function is called by installers to register the driver with the system.
@@ -389,6 +335,62 @@ MODULE_EXPORT int unregisterDriver(void) {
     if(0 != rmdir(buf))
         return errno;
     return 0;
+}
+
+// we assume clang or gcc here, or any other compiler whose atomics builtins are compatible
+typedef int dll_use_count_t;
+static int libUseCount = 0;
+static int updateUseCount(bool increaseNotDecrease) {
+    if (increaseNotDecrease)
+        return __sync_add_and_fetch(&libUseCount, 1);
+    else
+        return __sync_sub_and_fetch(&libUseCount, 1);
+}
+
+static void *getLibraryHandle(void) {    
+    // We iterate through the link_map list of the process until we find the address of our own object.
+    // On Linux, the address of the link_map is the handle returned by dlopen.
+    Dl_info info;
+    if (dladdr(&registerDriver, &info)) {
+        struct link_map *l;
+        dlinfo(dlopen(NULL, RTLD_LAZY), RTLD_DI_LINKMAP, &l);
+        while (l) {
+            if (l->l_addr == (intptr_t)info.dli_fbase)
+                return l;
+            l = l->l_next;
+        }
+    }
+    return NULL;
+}
+
+MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
+    // Create our instance.
+    struct cwASIODriver *obj = makeAsioDriver();
+    if (!obj)
+        return NULL;
+
+    void *ifc;
+    // Let cwAsioDriver's QueryInterface check the GUID and set the pointer.
+    // It also increments the reference count (to 2) if all goes well.
+    long hr = obj->lpVtbl->queryInterface(obj, guid, &ifc);
+
+    // NOTE: If there was an error in QueryInterface(), then Release() will be decrementing
+    // the count back to 0 and will delete the instance for us. One error that may occur is
+    // that the caller is asking for some sort of object that we don't support (i.e. it's a
+    // GUID we don't recognize).
+    obj->lpVtbl->release(obj);
+
+    if (hr == 0)
+        updateUseCount(true);
+
+    return NULL;
+}
+
+MODULE_EXPORT void releaseDriver(struct cwASIODriver *) {
+    if(0 == updateUseCount(false) {
+        void *handle = getLibraryHandle();
+        dlclose(handle);
+    }
 }
 
 #endif
