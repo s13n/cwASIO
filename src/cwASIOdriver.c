@@ -382,7 +382,7 @@ MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
     return NULL;
 }
 
-MODULE_EXPORT void releaseDriver(struct cwASIODriver *) {
+MODULE_EXPORT void releaseDriver(struct cwASIODriver *drv) {
     if(0 == updateUseCount(false)) {
         void *handle = getLibraryHandle();
         dlclose(handle);
