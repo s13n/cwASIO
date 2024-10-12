@@ -238,6 +238,27 @@ static char *cwASIOreadConfig(char const *base, char const *name, char const *fi
     }
 }
 
+int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size) {
+    if(!key) {
+        char path[2048];
+        int n = snprintf(path, sizeof(path), "/etc/cwASIO/%s", name);
+        struct stat st;
+        if (stat(path, &st) == 0 && S_ISDIR(st.st_mode))
+            return 0;
+        else
+            return ASE_NotPresent;
+    }
+
+    int ret = 0;
+    char *val = cwASIOreadConfig("/etc/cwASIO", name, key);
+    if (val && buffer && size > 0) {
+        strncpy(buffer, val, size);
+        ret = strlen(buffer);
+    }
+    free(val);
+    return ret;
+}
+
 int cwASIOenumerate(cwASIOcallback *cb, void *context) {
     static char const *path = "/etc/cwASIO";
     int res = 0;
