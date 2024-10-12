@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
 
-include(FetchContent)
-
 option(CWASIO_SHARED "Build cwASIO as a shared library" ${BUILD_SHARED_LIBS})
 if(CWASIO_SHARED)
     set(CWASIO_LIBTYPE SHARED)
