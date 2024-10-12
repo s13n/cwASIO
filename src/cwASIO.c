@@ -216,10 +216,11 @@ static char *cwASIOreadConfig(char const *base, char const *name, char const *fi
         return NULL;
     }
 
-    if (st.st_size > 1023)
-        st.st_size = 1023;  // limit buffer size
-    char *txt = (char *)malloc(st.st_size + 1);
-    ssize_t len = read(fd, txt, st.st_size);
+    size_t size = st.st_size;
+    if (size > 1023)
+        size = 1023;  // limit buffer size
+    char *txt = (char *)malloc(size + 1);
+    ssize_t len = read(fd, txt, size);
     int err = errno;
     close(fd);
     if (len < 0) {
