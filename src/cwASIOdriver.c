@@ -31,7 +31,7 @@
 #   include <unistd.h>
 #   include <sys/stat.h>
 
-#   define MODULE_EXPORT __attribute__((visibility("default")))
+#   define MODULE_EXPORT __attribute__((retain,visibility("default")))
 #endif
 
 /** This file provides the scaffolding for implementing a cwASIO driver that can be loaded by a host application.
