@@ -236,33 +236,25 @@ more than one driver loaded and used at the same time, if so desired.
 
 ## Multi-instance issues
 
-The original ASIO API was designed around the idea that there is only a single
-instance in a process. This shows in various places, and is difficult to
-overcome. Multi-instance issues present themselves in the following ways:
+The original ASIO API was designed around the idea that an application can only
+load a single driver, which is controlling a single device, and when one
+application uses the device another application can't. This shows in various
+places, and is difficult to overcome. However, with some careful thought and
+implementation, all three restrictions can be overcome.
 
-### Multiclient drivers
-
-This is the ability of a driver to accommodate several concurrent host
-applications. ASIO does support this, and drivers can be readily written that
-work in this way.
-
-For the driver writer, this means that the driver module (DLL or shared object)
-can be loaded concurrently by several processes, each of which will call
-`init()` on its interface. Since the hardware only exists once, the driver will
-have to keep track of the number of applications using it, and only initialize
-the hardware when the first application calls `init()`, and deinitialize it when
-the last one disappears. It will also have to manage conflicts when applications
-want to set the sampling rate, or other parameters, that would affect all host
-applications.
-
-It goes without saying that common data structures will have to be protected
-from concurrent access by different applications.
+Overcoming the first one is called multi-driver support, which permits
+applications to work with several drivers/devices at the same time, which has so
+far been very rare in applications. Overcoming the second one is called
+multi-instance support, which means that the same driver can be instantiated
+several times for different devices. This doesn't appear to have been supported
+until now at all. The third one is called multi-client support, which has been
+offered for a long time by drivers of some manufacturers, notably MOTU and RME.
 
 ### Multidriver applications
 
 This is the ability of an application to open more than one ASIO driver
 simultaneously. ASIO can support this, but not with the standard C API. The
-driver API (in cwASIO represented by cwASIODriverVtbl) needs to be used
+native API (in cwASIO represented by cwASIODriverVtbl) needs to be used
 directly.
 
 The callbacks of the driver API present an additional difficulty here. They lack
@@ -270,16 +262,24 @@ a context parameter that would permit to distinguish between the drivers, so the
 application must use some trickery to identify the driver that called one of the
 callbacks.
 
+When using the native cwASIO API, an application can relatively easily support
+multiple driver instances concurrently. Bear in mind, however, what this means
+in practice: The application gets callback calls from multiple threads
+concurrently, at possibly different rates. It depends on the application whether
+that makes sense, and under what circumstances. Even if it does make sense, the
+application needs to be written such that this level of concurrency doesn't
+cause problems.
+
 ### Multiinstance drivers
 
 This is the ability of a single driver to be instantiated multiple times for
 different audio hardware. For example, think about two devices that are managed
-by the same driver connected to the same computer. This can't be done with
-standard ASIO. The workaround used by some manufacturers is to load the driver
-once, and it takes care of all the connected hardware devices, effectively
-making them look as if they were one combined device. This only makes sense when
-the devices are synchronized between each other, i.e. they work from a common
-clock, and share the same settings.
+by the same driver connected to the same computer, like two cards plugged in, or
+two USB devices connected. This can't be done with standard ASIO. The workaround
+used by some manufacturers is to load the driver once, and it takes care of all
+the connected hardware devices, effectively making them look as if they were one
+combined device. This only makes sense when the devices are synchronized between
+each other, i.e. they work from a common clock, and share the same settings.
 
 Loading the same driver separately for each of the devices, with individual
 settings for them, is hampered by the difficulty to enumerate and identify the
@@ -320,6 +320,29 @@ presence of the hardware device itself. Providing an empty name string (or NULL)
 to the `future()` call should have no effect and return `ASE_SUCCESS` if the
 driver offers multiinstance support. This may be used to check for multiinstance
 support without setting a name.
+
+### Multiclient drivers
+
+This is the ability of a driver to accommodate several concurrent host
+applications. ASIO does support this, and drivers can be readily written that
+work in this way.
+
+For the driver writer, this means that the driver module (DLL or shared object)
+can be loaded concurrently by several processes, each of which will call
+`init()` on its interface. Since the hardware only exists once, the driver will
+have to keep track of the number of applications using it, and only initialize
+the hardware when the first application calls `init()`, and deinitialize it when
+the last one disappears. It will also have to manage conflicts when applications
+want to set the sampling rate, or other parameters, that would affect all host
+applications.
+
+Typically, the clients will use different channels of the same device, in order
+not to compromise the audio of other clients. In most cases, the driver doesn't
+attempt to mix the audio from different clients, although that would be
+technically feasible, with some potential loss of efficiency.
+
+It goes without saying that access to the common hardware will have to be
+protected from concurrent access by different applications.
 
 ## Writing a driver
 
