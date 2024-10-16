@@ -1,5 +1,5 @@
 /** @file       cwASIO.c
- *  @brief      cwASIO API (Unix implementation)
+ *  @brief      cwASIO native API
  *  @author     Stefan Heinzmann
  *  @version    1.0
  *  @date       2023-2024
@@ -8,284 +8,255 @@
  *  @{
  */
 
-#include "cwASIOifc.h"
-#include <alloca.h>
-#include <dirent.h>
-#include <dlfcn.h>
-#include <errno.h>
-#include <fcntl.h>
+#include "cwASIO.h"
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#ifdef _WIN32
+#   define NOMINMAX
+#   define WIN32_LEAN_AND_MEAN 
+#   include <Windows.h>
+#   include <combaseapi.h>
+#   include <guiddef.h>
+#   include <unknwnbase.h>
+#else
+#   include <alloca.h>
+#   include <dirent.h>
+#   include <dlfcn.h>
+#   include <errno.h>
+#   include <fcntl.h>
+#   include <unistd.h>
+#   include <sys/stat.h>
+#endif
 
-static struct AsioDriver *theAsioDriver = 0;
-static struct cwASIO_DriverInterface driverIfc = { 0 };
+#ifdef _WIN32
 
-
-ASIOError ASIOLoad(char const *path) {
-    if(driverIfc.driverLib)
-        return ASE_NoMemory;
-    return cwASIOload(path, &driverIfc);
-}
-
-ASIOError ASIOUnload(void) {
-    if (!driverIfc.driverLib)
-        return ASE_InvalidParameter;
-    cwASIOunload(&driverIfc);
-    driverIfc.driverLib = NULL;
-    return ASE_OK;
-}
-
-ASIOError ASIOInit(ASIODriverInfo *info) {
-    if(theAsioDriver || !driverIfc.driverLib)
-        return ASE_NotPresent;
-    theAsioDriver = driverIfc.instantiate(info ? info->sysRef : 0);
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    if(info) {
-        info->asioVersion = 2;
-        driverIfc.getDriverName(theAsioDriver, info->name);
-        info->driverVersion = driverIfc.getDriverVersion(theAsioDriver);
-        driverIfc.getErrorMessage(theAsioDriver, info->errorMessage);
+static char *toUTF8(wchar_t const *wstr) {
+    if (wstr) {
+        int len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
+        if (len > 0) {
+            char *buf = malloc(len);
+            len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, buf, len, NULL, NULL);
+            if (len > 0)
+                return buf;
+            free(buf);
+        }
     }
-    return ASE_OK;
+    return NULL;
+};
+
+static wchar_t *fromUTF8(char const *str) {
+    if (str) {
+        int len = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
+        if (len > 0) {
+            wchar_t *buf = malloc(len * sizeof(wchar_t));
+            len = MultiByteToWideChar(CP_UTF8, 0, str, -1, buf, len);
+            if (len > 0)
+                return buf;
+            free(buf);
+        }
+    }
+    return NULL;
+};
+
+long cwASIOload(char const *key, struct cwASIODriver **drv) {
+    CLSID id = cwASIOtoGUID(key);
+    // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
+    HRESULT res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, drv);
+    if (FAILED(res))
+        return res;
+    return 0;
 }
 
-ASIOError ASIOExit(void) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    driverIfc.discard(theAsioDriver);
-    theAsioDriver = 0;
-    return ASE_OK;
+void cwASIOunload(struct cwASIODriver *drv) {
+    if(drv)
+        drv->lpVtbl->release(drv);
 }
 
-ASIOError ASIOStart(void) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.start(theAsioDriver);
+static LSTATUS getValue(HKEY hkey, wchar_t *subKey, wchar_t *name, wchar_t **val, DWORD *len) {
+    LSTATUS err = ERROR_SUCCESS;
+    for (;;) {    // try until buffer size is sufficient
+        err = RegGetValueW(hkey, subKey, name, RRF_RT_REG_SZ, NULL, *val, len);
+        if (err != ERROR_MORE_DATA)
+            break;
+        wchar_t *tmp = *val;
+        *val = realloc(tmp, *len * sizeof(wchar_t));
+        if (!*val)
+            free(tmp);
+    }
+    if (*val && err != ERROR_SUCCESS)
+        (*val)[0] = '\0';
+    return err;
 }
 
-ASIOError ASIOStop(void) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.stop(theAsioDriver);
+int cwASIOenumerate(cwASIOcallback *cb, void *context) {
+    HKEY hkey;
+    LSTATUS err = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\ASIO", 0, KEY_READ, &hkey);
+    if (err != ERROR_SUCCESS)
+        return err;
+
+    DWORD subkeyLen;
+    err = RegQueryInfoKeyW(hkey, NULL, NULL, NULL, NULL, &subkeyLen, NULL, NULL, NULL, NULL, NULL, NULL);
+    if (err != ERROR_SUCCESS)
+        goto close_hkey;
+
+    wchar_t *subKey = malloc(sizeof(wchar_t) * (subkeyLen + 1));
+    DWORD clsidLen = 40;
+    wchar_t *clsid = malloc(sizeof(wchar_t) * clsidLen);
+    DWORD descriptionLen = 16;
+    wchar_t *description = malloc(sizeof(wchar_t) * descriptionLen);
+    for (DWORD index = 0; err != ERROR_NO_MORE_ITEMS; ++index) {
+        if (!subKey || !clsid || !description)
+            break;
+
+        DWORD nameLen = subkeyLen + 1;      // account for terminating NUL
+        err = RegEnumKeyExW(hkey, index, subKey, &nameLen, NULL, NULL, NULL, NULL);
+        if (err != ERROR_SUCCESS)
+            continue;
+
+        err = getValue(hkey, subKey, L"CLSID", &clsid, &clsidLen);
+        err = getValue(hkey, subKey, L"Description", &description, &descriptionLen);
+
+        char *nm = toUTF8(subKey);
+        char *id = toUTF8(clsid);
+        char *de = toUTF8(description);
+        if (cb(context, nm, id, de))
+            err = ERROR_SUCCESS;            // continue iteration if enumerate returns true
+        else
+            err = ERROR_NO_MORE_ITEMS;      // terminate iteration if enumerate returns false
+        free(de);
+        free(id);
+        free(nm);
+    }
+    err = ERROR_SUCCESS;
+    free(description);
+    free(clsid);
+    free(subKey);
+close_hkey:
+    RegCloseKey(hkey);
+    return err;
 }
 
-ASIOError ASIOGetChannels(long *numInputChannels, long *numOutputChannels) {
-    if(!theAsioDriver)
+int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size) {
+    enum {subkeysize = 256, buffersize=2048};
+    if(!name)
+        return ASE_InvalidParameter;
+    wchar_t subkey[subkeysize] = L"SOFTWARE\\ASIO\\";
+    int n = wcslen(subkey);     // remember length so far for appending
+    n = MultiByteToWideChar(CP_UTF8, 0, name, -1, subkey + n, subkeysize - n);      // append name
+    if(n <= 0)
+        return ASE_InvalidParameter;
+    wchar_t *value = fromUTF8(key);
+    if(!value) {    // we just check if the subkey exists
+        HKEY hk;
+        LSTATUS stat = RegOpenKeyW(HKEY_LOCAL_MACHINE, subkey, &hk);
+        if(stat != ERROR_SUCCESS)
+            return ASE_NotPresent;
+        RegCloseKey(hk);
+        return ASE_OK;
+    }
+    wchar_t buf[buffersize];
+    DWORD bufsize = buffersize;
+    LSTATUS err = RegGetValueW(HKEY_LOCAL_MACHINE, subkey, value, RRF_RT_REG_SZ, NULL, buf, &bufsize);
+    if (err) {
+        free(value);
         return ASE_NotPresent;
-    return driverIfc.getChannels(theAsioDriver, numInputChannels, numOutputChannels);
+    }
+    n = WideCharToMultiByte(CP_UTF8, 0, buf, bufsize, buffer, size, NULL, NULL);
+    free(value);
+    if(n <= 0)
+        return ASE_NotPresent;
+    return n <= (int)size ? n : (int)size;
 }
 
-ASIOError ASIOGetLatencies(long *inputLatency, long *outputLatency) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.getLatencies(theAsioDriver, inputLatency, outputLatency);
-}
+#else
 
-ASIOError ASIOGetBufferSize(long *minSize, long *maxSize, long *preferredSize, long *granularity) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.getBufferSize(theAsioDriver, minSize, maxSize, preferredSize, granularity);
-}
+typedef struct cwASIODriver * (CWASIO_METHOD InstantiateDriver)(cwASIOGUID const *);
 
-ASIOError ASIOCanSampleRate(ASIOSampleRate sampleRate) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.canSampleRate(theAsioDriver, sampleRate);
-}
-
-ASIOError ASIOGetSampleRate(ASIOSampleRate *currentRate) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.getSampleRate(theAsioDriver, currentRate);
-}
-
-ASIOError ASIOSetSampleRate(ASIOSampleRate sampleRate) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.setSampleRate(theAsioDriver, sampleRate);
-}
-
-ASIOError ASIOGetClockSources(ASIOClockSource *clocks, long *numSources) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.getClockSources(theAsioDriver, clocks, numSources);
-}
-
-ASIOError ASIOSetClockSource(long reference) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.setClockSource(theAsioDriver, reference);
-}
-
-ASIOError ASIOGetSamplePosition (ASIOSamples *sPos, ASIOTimeStamp *tStamp) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.getSamplePosition(theAsioDriver, sPos, tStamp);
-}
-
-ASIOError ASIOGetChannelInfo(ASIOChannelInfo *info) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.getChannelInfo(theAsioDriver, info);
-}
-
-ASIOError ASIOCreateBuffers(ASIOBufferInfo *bufferInfos, long numChannels, long bufferSize, ASIOCallbacks const *callbacks) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.createBuffers(theAsioDriver, bufferInfos, numChannels, bufferSize, callbacks);
-}
-
-ASIOError ASIODisposeBuffers(void) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.disposeBuffers(theAsioDriver);
-}typedef bool (EnumerateCallback)(void *, char const *, char const *, char const *);
-
-int cwASIOenumerate(EnumerateCallback *cb, void *context);
-
-
-
-ASIOError ASIOControlPanel(void) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.controlPanel(theAsioDriver);
-}
-
-ASIOError ASIOFuture(long selector, void *params) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.future(theAsioDriver, selector, params);
-}
-
-ASIOError ASIOOutputReady(void) {
-    if(!theAsioDriver)
-        return ASE_NotPresent;
-    return driverIfc.outputReady(theAsioDriver);
-}
-
-
-long cwASIOload(char const *path, struct cwASIO_DriverInterface *ifc) {
-    void *lib = dlopen(path, RTLD_LOCAL | RTLD_NOW);
+long cwASIOload(char const *id, struct cwASIODriver **drv) {
+    void *lib = dlopen(id, RTLD_LOCAL | RTLD_NOW);
     if(!lib)
         return ASE_NotPresent;
-    ifc->instantiate = (struct AsioDriver *(*)(void *))dlsym(lib, "cwASIOinstantiate");
-    if(!ifc->instantiate)
+
+    InstantiateDriver *instantiateDriver = dlsym(lib, "instantiateDriver");
+    if (!instantiateDriver)
         return ASE_NotPresent;
-    ifc->discard = (void (*)(struct AsioDriver *))dlsym(lib, "cwASIOdiscard");
-    if(!ifc->discard)
-        return ASE_NotPresent;
-    ifc->getDriverName = (void (*)(struct AsioDriver *, char *))dlsym(lib, "cwASIOgetDriverName");
-    if(!ifc->getDriverName)
-        return ASE_NotPresent;
-    ifc->getDriverVersion = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOgetDriverVersion");
-    if(!ifc->getDriverVersion)
-        return ASE_NotPresent;
-    ifc->getErrorMessage = (void (*)(struct AsioDriver *, char *))dlsym(lib, "cwASIOgetErrorMessage");
-    if(!ifc->getErrorMessage)
-        return ASE_NotPresent;
-    ifc->start = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOstart");
-    if(!ifc->start)
-        return ASE_NotPresent;
-    ifc->stop = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOstop");
-    if(!ifc->stop)
-        return ASE_NotPresent;
-    ifc->getChannels = (long (*)(struct AsioDriver *, long *, long *))dlsym(lib, "cwASIOgetChannels");
-    if(!ifc->getChannels)
-        return ASE_NotPresent;
-    ifc->getLatencies = (long (*)(struct AsioDriver *, long *, long *))dlsym(lib, "cwASIOgetLatencies");
-    if(!ifc->getLatencies)
-        return ASE_NotPresent;
-    ifc->getBufferSize = (long (*)(struct AsioDriver *, long *, long *, long *, long *))dlsym(lib, "cwASIOgetBufferSize");
-    if(!ifc->getBufferSize)
-        return ASE_NotPresent;
-    ifc->canSampleRate = (long (*)(struct AsioDriver *, double))dlsym(lib, "cwASIOcanSampleRate");
-    if(!ifc->canSampleRate)
-        return ASE_NotPresent;
-    ifc->getSampleRate = (long (*)(struct AsioDriver *, double *))dlsym(lib, "cwASIOgetSampleRate");
-    if(!ifc->getSampleRate)
-        return ASE_NotPresent;
-    ifc->setSampleRate = (long (*)(struct AsioDriver *, double))dlsym(lib, "cwASIOsetSampleRate");
-    if(!ifc->setSampleRate)
-        return ASE_NotPresent;
-    ifc->getClockSources = (long (*)(struct AsioDriver *, ASIOClockSource *, long *))dlsym(lib, "cwASIOgetClockSources");
-    if(!ifc->getClockSources)
-        return ASE_NotPresent;
-    ifc->setClockSource = (long (*)(struct AsioDriver *, long))dlsym(lib, "cwASIOsetClockSource");
-    if(!ifc->setClockSource)
-        return ASE_NotPresent;
-    ifc->getSamplePosition = (long (*)(struct AsioDriver *, ASIOSamples *, ASIOTimeStamp *))dlsym(lib, "cwASIOgetSamplePosition");
-    if(!ifc->getSamplePosition)
-        return ASE_NotPresent;
-    ifc->getChannelInfo = (long (*)(struct AsioDriver *, ASIOChannelInfo *))dlsym(lib, "cwASIOgetChannelInfo");
-    if(!ifc->getChannelInfo)
-        return ASE_NotPresent;
-    ifc->createBuffers = (long (*)(struct AsioDriver *, ASIOBufferInfo *, long , long , ASIOCallbacks const *))dlsym(lib, "cwASIOcreateBuffers");
-    if(!ifc->createBuffers)
-        return ASE_NotPresent;
-    ifc->disposeBuffers = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOdisposeBuffers");
-    if(!ifc->disposeBuffers)
-        return ASE_NotPresent;
-    ifc->controlPanel = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOcontrolPanel");
-    if(!ifc->controlPanel)
-        return ASE_NotPresent;
-    ifc->future = (long (*)(struct AsioDriver *, long, void *))dlsym(lib, "cwASIOfuture");
-    if(!ifc->future)
-        return ASE_NotPresent;
-    ifc->outputReady = (long (*)(struct AsioDriver *))dlsym(lib, "cwASIOoutputReady");
-    if(!ifc->outputReady)
-        return ASE_NotPresent;
-    ifc->driverLib = lib;
-    return ASE_OK;
+
+    // Under Linux, we pass a NULL for the interface ID; we don't need to check it.
+    *drv = instantiateDriver(NULL);
+
+    return *drv ? ASE_OK : ASE_NotPresent;
 }
 
-void cwASIOunload(struct cwASIO_DriverInterface *ifc) {
-    if(ifc)
-        dlclose(ifc->driverLib);
+void cwASIOunload(struct cwASIODriver *drv) {
+    if(drv)
+        drv->lpVtbl->release(drv);
 }
-
 
 static char *cwASIOreadConfig(char const *base, char const *name, char const *file) {
     size_t baseLen = strlen(base);
     size_t nameLen = strlen(name);
-    char *path = (char*)alloca(baseLen + 1 + nameLen + strlen(file) + 1);
+    char *path = (char *)alloca(baseLen + 1 + nameLen + strlen(file) + 1);
     strcpy(path, base);
     path[baseLen] = '/';
     strcpy(path + baseLen + 1, name);
     strcpy(path + baseLen + 1 + nameLen, file);
 
     int fd = open(path, O_RDONLY);
-    if(fd < 0)
+    if (fd < 0)
         return NULL;
 
     struct stat st;
-    if(fstat(fd, &st) < 0) {
+    if (fstat(fd, &st) < 0) {
         int err = errno;
         close(fd);
         errno = err;
         return NULL;
     }
 
-    if(st.st_size > 1023)
-        st.st_size = 1023;  // limit buffer size
-    char *txt = (char*)malloc(st.st_size + 1);
-    ssize_t len = read(fd, txt, st.st_size);
+    size_t size = st.st_size;
+    if (size > 1023)
+        size = 1023;  // limit buffer size
+    char *txt = (char *)malloc(size + 1);
+    ssize_t len = read(fd, txt, size);
     int err = errno;
     close(fd);
-    if(len < 0) {
+    if (len < 0) {
         free(txt);
         errno = err;
         return NULL;
-    } else {
+    }
+    else {
         txt[len] = '\0';
         char *end = strchr(txt, '\n');
-        if(end)
+        if (end)
             *end = '\0';    // terminate at end of first line
         errno = err;
         return txt;
     }
+}
+
+int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size) {
+    if(!key) {
+        char path[2048];
+        int n = snprintf(path, sizeof(path), "/etc/cwASIO/%s", name);
+        struct stat st;
+        if (stat(path, &st) == 0 && S_ISDIR(st.st_mode))
+            return 0;
+        else
+            return ASE_NotPresent;
+    }
+
+    int ret = 0;
+    char *val = cwASIOreadConfig("/etc/cwASIO", name, key);
+    if (val && buffer && size > 0) {
+        strncpy(buffer, val, size);
+        ret = strlen(buffer);
+    }
+    free(val);
+    return ret;
 }
 
 int cwASIOenumerate(cwASIOcallback *cb, void *context) {
@@ -294,28 +265,45 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
     struct dirent *rent;
     DIR *base = opendir(path);
 
-    if(!base)
+    if (!base)
         return errno;
 
     do {
         errno = 0;
         rent = readdir(base);
-        if(!rent) {
+        if (!rent) {
             res = errno;
             break;
-        } else if(rent->d_name[0] == '.') {
+        }
+        else if (rent->d_name[0] == '.') {
             continue;   // ignore entries starting with a dot
-        } else {
+        }
+        else {
             char *driver = cwASIOreadConfig(path, rent->d_name, "/driver");
             char *description = cwASIOreadConfig(path, rent->d_name, "/description");
-            if(!cb(context, rent->d_name, driver, description))
+            if (!cb(context, rent->d_name, driver, description))
                 rent = NULL;
             free(driver);
             free(description);
         }
-    } while(rent);
+    } while (rent);
 
     closedir(base);
+    return res;
+}
+
+#endif
+
+bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b) {
+    return a && b ? 0 == memcmp(a, b, sizeof(cwASIOGUID)) : a == b;
+}
+
+cwASIOGUID cwASIOtoGUID(char const *clsid) {
+    cwASIOGUID res;
+    int n = sscanf(clsid, "{%8" SCNx32 "-%4" SCNx16 "-%4" SCNx16 "-%2" SCNx8 "%2" SCNx8 "-%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "}"
+        , &res.Data1, &res.Data2, &res.Data3
+        , &res.Data4[0], &res.Data4[1], &res.Data4[2], &res.Data4[3]
+        , &res.Data4[4], &res.Data4[5], &res.Data4[6], &res.Data4[7]);
     return res;
 }
 
