@@ -20,8 +20,8 @@ PRIVATE
 # Build the driver library
 add_library(cwASIO_driver OBJECT cwASIO.c cwASIOdriver.c)
 add_library(cwASIO::driver ALIAS cwASIO_driver)
-set_target_properties(cwASIO_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-set_property(TARGET cwASIO_lib PROPERTY
+set_target_properties(cwASIO_driver PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET cwASIO_driver PROPERTY
     PUBLIC_HEADER cwASIOtypes.h cwASIO.h cwASIOdriver.h cwASIOdriver.def
 )
 target_sources(cwASIO_driver PUBLIC cwASIOtypes.h cwASIO.h cwASIOdriver.h)
