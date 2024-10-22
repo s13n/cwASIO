@@ -38,9 +38,14 @@ as a set of source files to integrate into the host application build process.
 Using CMake makes this easy, as cwASIO contains the necessary CMakeLists.txt
 files.
 
-### Linking to the cwASIO library
+### Linking to cwASIO
 
-TBC
+cwASIO uses the CMake library type "OBJECT", which keeps the object files that
+are built separate, instead of collecting them into a library file. When your
+project uses CMake, you should use FetchContent to incorporate cwASIO into your
+build, and then list the cwASIO targets you need among the dependent libraries.
+If you are using other build tools, please include the cwASIO sources into your
+build.
 
 ### Integrating the sources into the host build
 
