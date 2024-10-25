@@ -1,6 +1,8 @@
-; Module-definition file for a cwASIOdriver DLL for Unix.
-
 {
-    global: registerDriver, unregisterDriver, instantiateDriver, releaseDriver;
+    global:
+        registerDriver;
+        unregisterDriver;
+        instantiateDriver;
+        releaseDriver;
     local: *
 }
