@@ -4,5 +4,6 @@
         unregisterDriver;
         instantiateDriver;
         releaseDriver;
-    local: *
-}
+    local:
+        *;
+};
