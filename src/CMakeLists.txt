@@ -27,10 +27,11 @@ set_property(TARGET cwASIO_driver PROPERTY
 target_sources(cwASIO_driver PUBLIC cwASIOtypes.h cwASIO.h cwASIOdriver.h)
 target_include_directories(cwASIO_driver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Define C++ wrapper as an interface library
-add_library(cwASIO_libxx INTERFACE cwASIO.hpp)
-target_compile_features(cwASIO_libxx INTERFACE cxx_std_23)
-target_link_libraries(cwASIO_libxx INTERFACE cwASIO::lib)
+# Define C++ wrapper as an object library
+add_library(cwASIO_libxx OBJECT cwASIO.hpp cwASIO.cpp)
+add_library(cwASIO::libxx ALIAS cwASIO_libxx)
+target_compile_features(cwASIO_libxx PUBLIC cxx_std_17)
+target_link_libraries(cwASIO_libxx PUBLIC cwASIO::lib)
 set_property(TARGET cwASIO_libxx PROPERTY PUBLIC_HEADER cwASIO.hpp)
 
 # Build ASIO compatibility wrapper
