@@ -9,6 +9,7 @@
  */
 
 #include "cwASIO.hpp"
+#include <bit>
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
@@ -23,15 +24,17 @@
 
 using namespace std::literals;
 
+static_assert(std::endian::native == std::endian::little);
+
 static std::mutex bufferMutex;
 static std::queue<std::vector<int32_t>> bufferQueue;
 static std::vector<cwASIOBufferInfo> bufferInfos(2);
-static long blocksize{0};
+static long blocksize = 0;
 static cwASIOChannelInfo channelInfos[2];
 static std::sig_atomic_t volatile signalStatus = 0;
 
- 
-void signalHandler(int signal) {
+
+static void signalHandler(int signal) {
     signalStatus = signal;
 }
 
@@ -64,7 +67,7 @@ static long asioMessage(long selector, long value, void *message, double *opt) {
     return 0;
 }
 
-struct cwASIOTime *bufferSwitchTimeInfo(struct cwASIOTime *params, long doubleBufferIndex, cwASIOBool directProcess) {
+static struct cwASIOTime *bufferSwitchTimeInfo(struct cwASIOTime *params, long doubleBufferIndex, cwASIOBool directProcess) {
     bufferSwitch(doubleBufferIndex, directProcess);
     return params;
 }
@@ -94,29 +97,29 @@ static std::string getDriverId(std::string_view drivername) {
 }
 
 struct WAVfile {
-    struct Header {
-        uint8_t fileTypeBlocID[4] = {0x52, 0x49, 0x46, 0x46};    // RIFF tag
-        uint32_t fileSize = 36;                                  // Overall file size minus 8 bytes
-        uint8_t fileFormatID[4] = {0x57, 0x41, 0x56, 0x45};      // WAVE tag
-        uint8_t formatBlocID[4] = {0x66, 0x6D, 0x74, 0x20};      // fmt  tag
+    struct Header {     // simplest possible WAV header
+        char     fileTypeBlocID[4] = {'R','I','F','F'};
+        uint32_t fileSize = 36;         // Overall file size minus 8 bytes
+        char     fileFormatID[4] = {'W','A','V','E'};
+        char     formatBlocID[4] = {'f','m','t',' '};
         uint32_t blocSize = 16;
-        uint16_t audioFormat = 1;            // PCM integer
-        uint16_t nbrChannels = 2;            // Number of channels
-        uint32_t frequency;                  // Sample rate (in hertz)
-        uint32_t bytePerSec;                 // Number of bytes to read per second (Frequency * BytePerBloc).
-        uint16_t bytePerBloc = 8;            // Number of bytes per block (NbrChannels * BitsPerSample / 8).
-        uint16_t bitsPerSample = 32;         // Number of bits per sample
-        uint8_t dataBlocID[4] = {0x64, 0x61, 0x74, 0x61};        // data tag
-        uint32_t dataSize = 0;               // SampledData size
+        uint16_t audioFormat = 1;       // PCM integer
+        uint16_t nbrChannels = 2;       // Number of channels
+        uint32_t frequency;             // Sample rate (in Hz)
+        uint32_t bytePerSec;            // Number of bytes to read per second (frequency * bytePerBloc).
+        uint16_t bytePerBloc = 8;       // Number of bytes per block (nbrChannels * bitsPerSample / 8).
+        uint16_t bitsPerSample = 32;    // Number of bits per sample
+        char     dataBlocID[4] = {'d','a','t','a'};
+        uint32_t dataSize = 0;          // sampled data size
     };
 
     WAVfile(std::filesystem::path path, uint32_t samplerate)
         : os_(path, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary)
-        , written_{sizeof(Header)}
     {
         Header header{ .frequency = samplerate, .bytePerSec = samplerate * 8 };
         os_.exceptions(std::ofstream::failbit);
         os_.write(reinterpret_cast<char const *>(&header), sizeof(header));
+        written_ = sizeof(header);
     }
 
     ~WAVfile() {
@@ -134,16 +137,16 @@ struct WAVfile {
         std::cout << "Written " << (written_ / 8) << " samples\n";
     }
 
-    void write(std::vector<int32_t> const &vec) {
+    uint32_t write(std::vector<int32_t> const &vec) {
         os_.write(reinterpret_cast<char const *>(vec.data()), vec.size() * sizeof(int32_t));
         written_ += vec.size() * sizeof(int32_t);
+        return written_;
     }
 
     std::ofstream os_;
     uint32_t written_;
 };
 
-/* Command line arguments are: */
 int main(int argc, char const *argv[]) {
     if(argc != 4) {
         std::cout << "Usage: recorder <ASIO device> <first channel> <filename>\n";
@@ -191,20 +194,27 @@ int main(int argc, char const *argv[]) {
             throw std::system_error(ec, "when reading sampling rate");
 
         WAVfile file(filepath, samplerate);
-        
+
         std::signal(SIGINT, signalHandler);
-        
+
         if(auto err = driver.start())
             throw std::system_error(err, cwASIO::err_category(), "when trying to start streaming");
 
-        std::cout << "Recording device " << driver.getDriverName() << " channels " << channel << "&" << (channel + 1) << " at " << samplerate << " Hz\n";
+        std::cout << "Recording device " << driver.getDriverName()
+            << " (" << channelInfos[0].name << "/" << channelInfos[1].name << ") at " << samplerate << " Hz\n";
 
+        uint32_t limit = uint32_t(uint32_t(0) - 2 * blocksize * 8);     // file size limit 4GB
+        uint32_t last = 0;
         while(signalStatus == 0) {
             std::vector<int32_t> buf = getNext();
-            if(buf.empty())
+            if(buf.empty()) {
                 std::this_thread::sleep_for(10ms);
-            else
-                file.write(buf);
+            } else if(auto n = file.write(buf); n >= limit) {
+                break;
+            } else if(n > last + samplerate * 40) {
+                std::cout << "Written " << (n / 8) << " samples\r";
+                last = n;
+            }
         }
     } catch(std::exception &ex) {
         std::cerr << "Error: " << ex.what() << "\n";
