@@ -377,9 +377,10 @@ MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
     obj->lpVtbl->release(obj);
 
     if (hr == 0)
-        updateUseCount(true);
-
-    return NULL;
+        return NULL;
+    
+    updateUseCount(true);
+    return obj;
 }
 
 MODULE_EXPORT void releaseDriver(struct cwASIODriver *drv) {
