@@ -1,0 +1,9 @@
+{
+    global:
+        registerDriver;
+        unregisterDriver;
+        instantiateDriver;
+        releaseDriver;
+    local:
+        *;
+};

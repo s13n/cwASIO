@@ -63,16 +63,22 @@ static wchar_t *fromUTF8(char const *str) {
 
 long cwASIOload(char const *key, struct cwASIODriver **drv) {
     CLSID id = cwASIOtoGUID(key);
-    // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
-    HRESULT res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, drv);
+    HRESULT res = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(res))
         return res;
+    // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
+    res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, drv);
+    if (FAILED(res)) {
+        CoUninitialize();
+        return res;
+    }
     return 0;
 }
 
 void cwASIOunload(struct cwASIODriver *drv) {
     if(drv)
         drv->lpVtbl->release(drv);
+    CoUninitialize();
 }
 
 static LSTATUS getValue(HKEY hkey, wchar_t *subKey, wchar_t *name, wchar_t **val, DWORD *len) {

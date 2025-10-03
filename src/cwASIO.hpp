@@ -13,7 +13,6 @@ extern "C" {
     #include "cwASIO.h"
 }
 #include <chrono>
-#include <expected>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -28,24 +27,8 @@ namespace cwASIO {
      */
     class Errc_category : public std::error_category {
     public:
-        const char *name() const noexcept override final {
-            return "cwASIO Error";
-        }
-
-        std::string message(int c) const override final {
-            switch (c) {
-            case ASE_OK:               return "success";
-            case ASE_SUCCESS:          return "successful future() call";
-            case ASE_NotPresent:       return "hardware input or output is not present or available";
-            case ASE_HWMalfunction:    return "hardware is malfunctioning";
-            case ASE_InvalidParameter: return "input parameter invalid";
-            case ASE_InvalidMode:      return "hardware is in a bad mode or used in a bad mode";
-            case ASE_SPNotAdvancing:   return "hardware is not running when sample position is inquired";
-            case ASE_NoClock:          return "sample clock or rate cannot be determined or is not present";
-            case ASE_NoMemory:         return "not enough memory for completing the request";
-            default:                   return "general error";
-            }
-        }
+        const char *name() const noexcept override final;
+        std::string message(int) const override final;
     };
 
     static Errc_category const &err_category() {
@@ -73,13 +56,7 @@ namespace cwASIO {
         Driver(Driver &&) = delete;
 
     public:
-        explicit Driver(std::string id)
-            : drv_{ nullptr }
-        {
-            auto err = cwASIOload(id.c_str(), &drv_);
-            if (err || !drv_ || !drv_->lpVtbl)
-                throw std::runtime_error("can't load cwASIO driver " + id + " err=" + std::to_string(err));
-        }
+        explicit Driver(std::string id);
 
         ~Driver() {
             cwASIOunload(drv_);
@@ -91,20 +68,13 @@ namespace cwASIO {
             return drv_->lpVtbl->init(drv_, sysHandle);
         }
 
-        void getDriverName(char *name) {
-            drv_->lpVtbl->getDriverName(drv_, name);
-        }
+        std::string getDriverName();
 
         long getDriverVersion() {
             return drv_->lpVtbl->getDriverVersion(drv_);
         }
 
-        std::string getErrorMessage() {
-            std::string errorMessage(124, '\0');
-            drv_->lpVtbl->getErrorMessage(drv_, errorMessage.data());
-            errorMessage.resize(std::min(errorMessage.find('\0'), errorMessage.length()));
-            return errorMessage;
-        }
+        std::string getErrorMessage();
 
         cwASIOError start() {
             return drv_->lpVtbl->start(drv_);
@@ -114,33 +84,35 @@ namespace cwASIO {
             return drv_->lpVtbl->stop(drv_);
         }
 
-        std::tuple<cwASIOError, long, long> getChannels() {
+        std::tuple<long, long> getChannels(std::error_code &ec) {
             long numInputChannels, numOutputChannels;
-            auto err = drv_->lpVtbl->getChannels(drv_, &numInputChannels, &numOutputChannels);
-            return { err, numInputChannels, numOutputChannels };
+            if(auto err = drv_->lpVtbl->getChannels(drv_, &numInputChannels, &numOutputChannels))
+                ec.assign(err, err_category());
+            return { numInputChannels, numOutputChannels };
         }
 
-        std::tuple<cwASIOError, long, long> getLatencies() {
+        std::tuple<long, long> getLatencies(std::error_code &ec) {
             long inputLatency, outputLatency;
-            auto err = drv_->lpVtbl->getLatencies(drv_, &inputLatency, &outputLatency);
-            return { err, inputLatency, outputLatency };
+            if(auto err = drv_->lpVtbl->getLatencies(drv_, &inputLatency, &outputLatency))
+                ec.assign(err, err_category());
+            return { inputLatency, outputLatency };
         }
 
-        std::tuple<cwASIOError, long, long, long, long> getBufferSize() {
+        std::tuple<long, long, long, long> getBufferSize(std::error_code &ec) {
             long minSize, maxSize, preferredSize, granularity;
-            auto err = drv_->lpVtbl->getBufferSize(drv_, &minSize, &maxSize, &preferredSize, &granularity);
-            return { err, minSize, maxSize, preferredSize, granularity };
+            if(auto err = drv_->lpVtbl->getBufferSize(drv_, &minSize, &maxSize, &preferredSize, &granularity))
+                ec.assign(err, err_category());
+            return { minSize, maxSize, preferredSize, granularity };
         }
 
         cwASIOError canSampleRate(double sampleRate) {
             return drv_->lpVtbl->canSampleRate(drv_, sampleRate);
         }
 
-        std::expected<double, std::error_code> getSampleRate() {
+        double getSampleRate(std::error_code &ec) {
             double sampleRate;
-            auto err = drv_->lpVtbl->getSampleRate(drv_, &sampleRate);
-            if (err)
-                return std::unexpected(std::error_code(err, err_category()));
+            if(auto err = drv_->lpVtbl->getSampleRate(drv_, &sampleRate))
+                ec.assign(err, err_category());
             return sampleRate;
         }
 
@@ -148,28 +120,17 @@ namespace cwASIO {
             return drv_->lpVtbl->setSampleRate(drv_, sampleRate);
         }
 
-        std::expected<std::vector<cwASIOClockSource>, std::error_code> getClockSources() {
-            std::vector<cwASIOClockSource> clocks(1);
-            long numSources = long(clocks.size());
-            auto err = drv_->lpVtbl->getClockSources(drv_, clocks.data(), &numSources);
-            if (size_t(numSources) > clocks.size()) {
-                clocks.resize(numSources);
-                err = drv_->lpVtbl->getClockSources(drv_, clocks.data(), &numSources);
-            }
-            if (err)
-                return std::unexpected(std::error_code(err, err_category()));
-            return clocks;
-        }
+        std::vector<cwASIOClockSource> getClockSources(std::error_code &ec);
 
         cwASIOError setClockSource(long reference) {
             return drv_->lpVtbl->setClockSource(drv_, reference);
         }
 
-        std::expected<SamplePosition, std::error_code> getSamplePosition() {
+        SamplePosition getSamplePosition(std::error_code &ec) {
             cwASIOSamples asp;
             cwASIOTimeStamp ats;
             if(auto err = drv_->lpVtbl->getSamplePosition(drv_, &asp, &ats))
-                return std::unexpected(std::error_code(err, err_category()));
+                ec.assign(err, err_category());
             return SamplePosition{ std::chrono::nanoseconds(qWord(ats)), qWord(asp) };
         }
 
