@@ -18,6 +18,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -149,14 +150,14 @@ struct WAVfile {
 
 int main(int argc, char const *argv[]) {
     if(argc != 4) {
-        std::cout << "Usage: recorder <ASIO device> <first channel> <filename>\n";
+        std::cout << "Usage: recorder <ASIO device> <first channel index> <filename>\n";
         return 1;
     }
 
     try {
         std::error_code ec;
         cwASIO::Driver driver(getDriverId(argv[1]));
-        auto channel = strtoul(argv[2], nullptr, 10);
+        auto firstChanIndex = strtol(argv[2], nullptr, 10);
         std::filesystem::path filepath(argv[3]);
 
         if(!driver.init(nullptr))
@@ -166,27 +167,29 @@ int main(int argc, char const *argv[]) {
         auto [numInputChannels, _] = driver.getChannels(ec);
         if(ec)
             throw std::system_error(ec, "when reading number of channels");
-        if(numInputChannels <= channel+1)
-            throw std::runtime_error("requested input channels not available");
+        if(firstChanIndex < 0)
+            throw std::runtime_error("first channel index must not be negative");
+        if(firstChanIndex + 2 > numInputChannels)
+            throw std::runtime_error("not enough input channels");
 
         auto [_0, _1, preferredSize, _2] = driver.getBufferSize(ec);
         if(ec)
             throw std::system_error(ec, "when reading supported buffer sizes");
 
         bufferInfos[0].isInput = bufferInfos[1].isInput = true;
-        bufferInfos[0].channelNum = channel;
-        bufferInfos[1].channelNum = channel + 1;
+        bufferInfos[0].channelNum = firstChanIndex;
+        bufferInfos[1].channelNum = firstChanIndex + 1;
         if(auto err = driver.createBuffers(bufferInfos.data(), bufferInfos.size(), preferredSize, &callbacks))
             throw std::system_error(err, cwASIO::err_category(), "when trying to create the buffers");
         blocksize = preferredSize;
 
-        for(size_t ch = 0; ch < std::size(channelInfos); ++ch) {
-            channelInfos[ch].channel = channel + ch;
+        for(long ch = 0; ch < long(std::size(channelInfos)); ++ch) {
+            channelInfos[ch].channel = firstChanIndex + ch;
             channelInfos[ch].isInput = true;
             if(auto err = driver.getChannelInfo(channelInfos[ch]))
-                throw std::system_error(err, cwASIO::err_category(), "when reading the info for channel " + std::to_string(ch));
+                throw std::system_error(err, cwASIO::err_category(), "when reading the info for channel with index " + std::to_string(ch));
             if(channelInfos[ch].type != ASIOSTInt32LSB)
-                throw std::runtime_error("Sample type not supported on channel " + std::to_string(ch) + " (" + channelInfos[ch].name + ")");
+                throw std::runtime_error("Sample type not supported on channel with index " + std::to_string(ch) + " (" + channelInfos[ch].name + ")");
         }
 
         uint32_t samplerate = uint32_t(driver.getSampleRate(ec));
