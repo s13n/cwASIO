@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Instantiatiating device %s (%s): %s\n", ctx.name, ctx.id, ctx.descr ? ctx.descr : "");
+    printf("Instantiating device %s (%s): %s\n", ctx.name, ctx.id, ctx.descr ? ctx.descr : "");
     struct cwASIODriver *drv = NULL;
     long err = cwASIOload(ctx.id, &drv);
     if(err != 0) {
