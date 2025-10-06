@@ -2,10 +2,9 @@
  *  @brief      cwASIO driver support
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2023-2024
+ *  @date       2023-2025
  *  @copyright  See file LICENSE in toplevel directory
  */
-#pragma once
 
 extern "C" {
     #include "cwASIOdriver.h"
@@ -20,6 +19,7 @@ cwASIOGUID const cwAsioDriverCLSID = {/*0x________,0x____,0x____,0x__,0x__,0x__,
 char const *cwAsioDriverKey = "";
 char const *cwAsioDriverDescription = "";
 
+std::atomic_uint activeInstances = 0;
 
 /** Your driver implemented as a C++ class. */
 class MyAsioDriver : public cwASIODriver {
