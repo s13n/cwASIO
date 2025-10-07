@@ -51,8 +51,8 @@ public:
 
     // data chunk header of a WavFile
     typedef struct {
-        char        chunk[4];   /* fourcc           */
-        u_int32_t   length;     /* length of chunck */
+        char        chunk[4];   /* fourcc          */
+        uint32_t    length;     /* length of chunk */
     } WAVFILE_CHUNK;
 
     WaveFile ( );
