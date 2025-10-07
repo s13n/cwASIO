@@ -1,29 +1,29 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 
-class WaveFile
-{
+class WaveFile {
 public:
-    typedef struct {
+    struct WAVFILE_HEADER {
         char        main_chunk[4];  /* 'RIFF' or 'RF64'	*/
         uint32_t    main_length;    /* Laenge der Datei	*/
         char        chunk_type[4];  /* 'WAVE'	*/
-    } WAVFILE_HEADER;
+    };
 
     // ds64 chunk of a WavFile
-    typedef struct {
+    struct WAVFILE_DS64CHUNK {
         char        ds64_chunk[4];  /* 'ds64'                       */
         uint32_t    ds64_length;    /* length of ds64 chunk         */
         uint64_t    riffSize;       /* 64 bit length of RIFF file   */
         uint64_t    dataSize;       /* 64 bit length of data chunk  */
         uint64_t    sampleCount;    /* sample count in 64 bit       */
         uint32_t    table_length;   /* length of ds64 chunk table   */
-    } WAVFILE_DS64CHUNK;
+    };
 
     // format chunk of a WavFile
-    typedef struct {
+    struct WAVFILE_FMTCHUNK {
         char        fmt_chunk[4];       /* 'fmt '                                           */
         uint32_t    fmt_length;         /* length of format chunk, always 16 bytes          */
         uint16_t    formatTag;          /* 1 for PCM, 0x50 for MPEG                         */
@@ -32,34 +32,34 @@ public:
         int32_t     nAvgBytesPerSec;    /* samples/sec * channels * bytes/sample            */
         int16_t     nBlockAlign;        /* offset = bytes/sample * channels                 */
         int16_t     nBitsPerSample;     /* 8, 12, 16, 24 or 32 bits                         */
-    } WAVFILE_FMTCHUNK;
+    };
 
     // GUID
-    typedef struct {
+    struct GUID {
         uint32_t    Data1;
         uint16_t    Data2;
         uint16_t    Data3;
         uint8_t     Data4[8];
-    } GUID;
+    };
 
     // wave format extensible chunk of a WavFile
-    typedef struct {
+    struct WAVFILEEXT_FMTCHUNKEXT {
         uint16_t    wValidBitsPerSample;    /* bits of precision  */
         uint32_t    dwChannelMask;          /* which channels are selected */
         GUID        SubFormat;
-    } WAVFILEEXT_FMTCHUNKEXT;
+    };
 
     // data chunk header of a WavFile
-    typedef struct {
+    struct WAVFILE_CHUNK {
         char        chunk[4];   /* fourcc          */
         uint32_t    length;     /* length of chunk */
-    } WAVFILE_CHUNK;
+    };
 
     WaveFile ( );
     virtual ~WaveFile ( );
 
-    std::string open ( char const *filename,  unsigned long samplerate, unsigned long bitsPerSample, unsigned long channels );
-    std::string open ( char const *filename );
+    std::string open ( std::filesystem::path filename,  unsigned long samplerate, unsigned long bitsPerSample, unsigned long channels );
+    std::string open ( std::filesystem::path filename );
     std::string close ( );
     std::string write ( void const *data, unsigned long samples );
     unsigned long read ( unsigned long samples, void *data );
@@ -91,4 +91,3 @@ private:
     unsigned long long dataLength_;
     unsigned long startOfData_;
 };
-

@@ -302,11 +302,11 @@ std::string WaveFile::searchChunk ( FILE* fp, const char *identifier ) {
     }
 }
 
-std::string WaveFile::open ( char const *filename, unsigned long samplerate, unsigned long bitsPerSample, unsigned long channels ) {
-    FILE* fp = fopen ( filename, "wb" );
+std::string WaveFile::open ( std::filesystem::path filename, unsigned long samplerate, unsigned long bitsPerSample, unsigned long channels ) {
+    FILE* fp = fopen ( filename.string().c_str(), "wb" );
 
     if ( fp == NULL ) {
-        return "Error opening file \""s + filename + "\".";
+        return "Error opening file \"" + filename.string() + "\".";
     }
 
     std::string result = writeHeaders ( fp, bitsPerSample, samplerate, channels, 0 );
@@ -316,7 +316,7 @@ std::string WaveFile::open ( char const *filename, unsigned long samplerate, uns
     }
 
     fp_ = fp;
-    filename_ = filename;
+    filename_ = filename.string();
     samples_ = 0;
     readNotWrite_ = false;
     dataLength_ = 0;
@@ -324,11 +324,11 @@ std::string WaveFile::open ( char const *filename, unsigned long samplerate, uns
     return "";
 }
 
-std::string WaveFile::open ( char const *filename ) {
-    FILE* fp = fopen ( filename, "rb" );
+std::string WaveFile::open ( std::filesystem::path filename) {
+    FILE* fp = fopen ( filename.string().c_str(), "rb" );
 
     if ( fp == NULL ) {
-        return "Error opening file \""s + filename + "\".";
+        return "Error opening file \"" + filename.string() + "\".";
     }
 
     std::string result = readHeaders ( fp );
@@ -338,7 +338,7 @@ std::string WaveFile::open ( char const *filename ) {
     }
 
     fp_ = fp;
-    filename_ = filename;
+    filename_ = filename.string();
     samples_ = 0;
     readNotWrite_ = true;
 
@@ -532,4 +532,3 @@ bool WaveFile::setPositionAbsoluteBackward ( unsigned long long samples ) {
 
     return true;
 }
-
