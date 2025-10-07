@@ -28,7 +28,7 @@ class MyAsioDriver : public cwASIODriver {
 public:
     MyAsioDriver()
         : cwASIODriver{ &vtbl }
-        , references{0}
+        , references{1}
         // .... (you may do some more member initialization here)
     {
     }
