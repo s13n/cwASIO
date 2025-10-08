@@ -60,7 +60,14 @@ struct cwASIODriver {
     struct cwASIODriverVtbl const *lpVtbl;
 };
 
-typedef bool (cwASIOcallback)(void*, char const*, char const*, char const*);
+/** Enumeration callback function signature.
+ * @param context Context pointer that was provided to cwASIOenumerate().
+ * @param name Pointer to null-terminated name string
+ * @param id Pointer to null-terminated id string (may be NULL)
+ * @param decription Pointer to null-terminated description string (may be NULL)
+ * @return true when enumeration should continue, false when it should terminate.
+ */
+typedef bool (cwASIOcallback)(void *context, char const *name, char const *id, char const *description);
 
 /** Enumerate devices installed on the system.
  * An enumeration function is passed to `cwASIOenumerate()`, which will get called once
