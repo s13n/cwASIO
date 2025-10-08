@@ -359,19 +359,21 @@ static void *getLibraryHandle(void) {
     return NULL;
 }
 
-MODULE_EXPORT struct cwASIODriver *instantiateDriver() {
+MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
     // Create our instance.
     struct cwASIODriver *obj = makeAsioDriver();
     if (!obj)
         return NULL;
 
     void *ifc;
-    // Let cwAsioDriver's QueryInterface set the pointer.
+    // Let cwAsioDriver's QueryInterface check the GUID and set the pointer.
     // It also increments the reference count (to 2) if all goes well.
-    long hr = obj->lpVtbl->queryInterface(obj, NULL, &ifc);
+    long hr = obj->lpVtbl->queryInterface(obj, guid, &ifc);
 
     // NOTE: If there was an error in QueryInterface(), then Release() will be decrementing
-    // the count back to 0 and will delete the instance for us.
+    // the count back to 0 and will delete the instance for us. One error that may occur is
+    // that the caller is asking for some sort of object that we don't support (i.e. it's a
+    // GUID we don't recognize).
     obj->lpVtbl->release(obj);
 
     if (hr != 0)
