@@ -56,7 +56,7 @@ namespace cwASIO {
         Driver(Driver &&) = delete;
 
     public:
-        explicit Driver(std::string id);
+        explicit Driver(std::string id, std::string name);
 
         ~Driver() {
             cwASIOunload(drv_);
