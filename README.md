@@ -573,10 +573,15 @@ particular cwASIO support.
 However, a few things must be borne in mind here in conjunction with cwASIO. The
 most intuitive location for storing device-specific settings is in the same
 place where the devices are listed for enumeration, i.e. in the Windows
-Registry, or in `/etc/cwASIO` on Linux. For user specific settings, there is the
-possibility to store them in files in the user's home directory, where the
-appropriate access rights are in force, or (on Windows) in a registry place
-where the user has write access.
+Registry, or in `/etc/cwASIO` on Linux, which is why there is support for it
+with the function `cwASIOgetParameter()`, defined in `cwASIO.h`, which can be
+used to retrieve entries from the same place where the driver is registered.
+They would have been placed there on installation, and the function provides an
+easy way for an application or driver to retrieve them. For user specific
+settings, there is the possibility to store them in files in the user's home
+directory, where the appropriate access rights are in force, or (on Windows) in
+a registry place where the user has write access. For those there's no direct
+cwASIO support.
 
 If the driver doesn't support multiinstance, it must have the name hardcoded,
 under which the entry in the registry is found (we call it the default name). A
