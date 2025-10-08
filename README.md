@@ -312,8 +312,7 @@ A driver that understands the new selector would store the name passed. The
 subsequent `init()` call would use the stored name to distinguish between
 different hardware devices, and to locate any further information specific to
 the hardware device in the registry. If no `future()` call was made before
-calling `init()`, no name is known, and the driver has to make an intelligent
-choice by itself.
+calling `init()`, no name is known, and the driver has to use a default name.
 
 Calling `future()` with the new selector `kcwASIOsetInstanceName` will be
 answered with `ASE_InvalidParameter` by a driver that offers no multiinstance
@@ -325,6 +324,50 @@ presence of the hardware device itself. Providing an empty name string (or NULL)
 to the `future()` call should have no effect and return `ASE_SUCCESS` if the
 driver offers multiinstance support. This may be used to check for multiinstance
 support without setting a name.
+
+For supporting legacy applications under Windows, there is also the possibility
+of registering the same driver under several different CLSID values, which get
+passed to the driver on instantiation. This can be used to select a different
+default name for each CLSID passed.
+
+Note that there are four combinations involving host applications and drivers
+that may or may not support multiinstance:
+
+1. Legacy application uses legacy driver (on Windows only).\
+   Only a single instance of the driver can be used, and only one entry in the
+   registry can be created for the driver. That entry will have the default name
+   of the driver, which can't be changed, because the driver won't understand
+   the `future()` call to change it. The legacy application won't set the name
+   with `future()` anyway.
+2. Legacy application uses cwASIO driver (on Windows only).\
+   The driver may control more than one device, and there is a registry entry
+   for each. The legacy application can enumerate them in the normal way. The
+   legacy application won't use `future()` to set the instance name, so the
+   driver will have to use a different default name for each instance. The way
+   to do that is by using different CLSID entries in each registry entry, i.e.
+   to register in COM the same driver DLL under several different CLSID values.
+   The driver needs to have a built-in table that maps those CLSID values to
+   default names. It would be up to the driver manufacturer to come up with a
+   fixed list of CLSIDs for as many parallel instances as the driver is supposed
+   to support. On driver instantiation, the CLSID that the application has
+   chosen is passed to the queryInterface() function of the driver as the IID,
+   so the driver has a chance to choose the appropriate default name based on
+   the passed GUID.
+3. cwASIO application uses legacy driver (on Windows only).\
+   The driver will only offer one device, i.e. one registry entry, and it won't
+   support the setting of an instance name through `future()`. The application,
+   which will try to set the name with a call to `future()`, will receive an
+   error, telling it that it is working with a legacy driver.
+4. cwASIO application uses cwASIO driver (on all platforms).\
+   There can be multiple registry entries for one driver, corresponding to
+   multiple devices. The application instantiates one, and then sets its name
+   with `future()`. On Windows, the driver would have chosen the appropriate
+   default name via the IID already, so the call to `future()` would not change
+   anything, except telling the driver that the application is not a legacy
+   application (if that's something the driver would wish to know). On Linux, no
+   IID is used, and the application can't be legacy, as this doesn't exist on
+   Linux. In fact, on Linux, the call to `future()` to set the instance name is
+   mandatory before calling `init()`.
 
 ### Multiclient drivers
 
@@ -481,3 +524,48 @@ Of course, you must have the right to write to `/etc/cwASIO`, otherwise the
 calls to `registerDriver` or `unregisterDriver` will fail with an error
 indicating isufficient rights. Both functions return 0 on success, and an errno
 in case of failure.
+
+## Handling driver settings
+
+A driver will likely have to store device specific settings, and read them when
+starting up. In case of a multiinstance driver, the location will differ between
+different devices the driver controls. A driver that supports only one instance
+will use a single, fixed location. See the description above of multiinstance
+drivers.
+
+It is up to the driver writer to define where those settings are stored. There
+is nothing ASIO or cwASIO defines here. Your driver may want to store settings
+per user, per hardware configuration, per device or per driver, or any
+combination thereof. The driver implements this all by itself, with no
+particular cwASIO support.
+
+However, a few things must be borne in mind here in conjunction with cwASIO. The
+most intuitive location for storing device-specific settings is in the same
+place where the devices are listed for enumeration, i.e. in the Windows
+Registry, or in `/etc/cwASIO` on Linux. For user specific settings, there is the
+possibility to store them in files in the user's home directory, where the
+appropriate access rights are in force, or (on Windows) in a registry place
+where the user has write access.
+
+If the driver doesn't support multiinstance, it must have the name hardcoded,
+under which the entry in the registry is found (we call it the default name). A
+multiinstance driver permits overriding the default name with the `future()`
+call described above. This means that reading the settings should be done by the
+`init()` function, because only then the driver instance knows its name, which
+it will need to locate the proper settings. The `init()` function also has the
+ability to report any errors that were encountered while reading the settings,
+and applying them to the device.
+
+The prerequisite for this to work is that the driver instance uses the same name
+under which the device is listed in the registry. Thus, the host application
+must pass the exact name to the driver with the `future()` call, under which it
+found the driver during enumeration. The driver should check in the `future()`
+call if the registry contains an entry for this name, but it should leave the
+reading of the settings to the `init()` function.
+
+The driver should report back in `getDriverName()` the same name that was set
+with the `future()` call, if that was successful. Otherwise it should report
+back the default name.
+
+To see an example how the host application is supposed to handle this, refer to
+`test/application.c`.
