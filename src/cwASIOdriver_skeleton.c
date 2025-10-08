@@ -27,9 +27,18 @@ struct MyAsioDriver {
 };
 
 static long CWASIO_METHOD queryInterface(struct cwASIODriver *drv, cwASIOGUID const *guid, void **ptr) {
-    if (!cwASIOcompareGUID(guid, &cwAsioDriverCLSID)) {
-        *ptr = NULL;
-        return E_NOINTERFACE;
+    if (guid) {     // This is only non-null on Windows
+        // For a multiinstance driver on Windows, we have the opportunity here
+        // to set different default names depending on the guid passed. The
+        // driver must define multiple guids instead of just one, and register
+        // itself with Windows COM under each of them. Each of them would
+        // correspond with a default name, which would then reported via
+        // getDriverName(). In this example, we just support one guid and one
+        // name. Otherwise the following `if` would become a loop.
+        if (!cwASIOcompareGUID(guid, &cwAsioDriverCLSID)) {
+            *ptr = NULL;
+            return E_NOINTERFACE;
+        }
     }
     // It's our GUID
     *ptr = drv;
