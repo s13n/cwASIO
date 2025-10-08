@@ -179,7 +179,7 @@ int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned
 
 #else
 
-typedef struct cwASIODriver * (CWASIO_METHOD InstantiateDriver)();
+typedef struct cwASIODriver * (CWASIO_METHOD InstantiateDriver)(void);
 
 long cwASIOload(char const *id, struct cwASIODriver **drv) {
     void *lib = dlopen(id, RTLD_LOCAL | RTLD_NOW);

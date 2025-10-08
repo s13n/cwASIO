@@ -273,9 +273,6 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
 
 #else // not _WIN32
 
-/* On Linux TBD
- */
-
 /** Put registration info into /etc/cwASIO.
  *
  * This function is called by installers to register the driver with the system.
@@ -378,16 +375,16 @@ static void *getLibraryHandle(void) {
     return NULL;
 }
 
-MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
+MODULE_EXPORT struct cwASIODriver *instantiateDriver(void) {
     // Create our instance.
     struct cwASIODriver *obj = makeAsioDriver();
     if (!obj)
         return NULL;
 
     void *ifc;
-    // Let cwAsioDriver's QueryInterface check the GUID and set the pointer.
+    // Let cwAsioDriver's QueryInterface set the pointer.
     // It also increments the reference count (to 2) if all goes well.
-    long hr = obj->lpVtbl->queryInterface(obj, guid, &ifc);
+    long hr = obj->lpVtbl->queryInterface(obj, NULL, &ifc);
 
     // NOTE: If there was an error in QueryInterface(), then Release() will be decrementing
     // the count back to 0 and will delete the instance for us. One error that may occur is
