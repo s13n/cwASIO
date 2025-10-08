@@ -2,7 +2,7 @@
  *  @brief      cwASIO driver support
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2023-2024
+ *  @date       2023-2025
  *  @copyright  See file LICENSE in toplevel directory
  * \addtogroup cwASIO
  *  @{
@@ -28,21 +28,22 @@ enum {
 };
 #endif
 
-/** The COM class GUID of the driver.
- * This is a GUID that identifies the driver, and thus is driver specific. The driver implementer
- * must provide the definition.
+/** Entry describing a registration name and its corresponding GUID.
+ * A driver will contain a table of those, terminated by an entry with a NULL ptr as the name.
+ * Drivers with multiinstance capability will have more than one entry in this table. The first
+ * entry is the "default" entry that is used unless a different name is given.
  */
-extern cwASIOGUID const cwAsioDriverCLSID;
+struct cwASIOinstance {
+    char const *name;   //!< The name under which the instance gets registered.
+    cwASIOGUID guid;    //!< The GUID that corresponds to this name on Windows.
+};
 
-/** The key string (UTF-8) for the driver.
- * This will be used in driver registration. Keep its length reasonable.
+/** The list of instance names and GUIDs the driver supports.
+ * This points to a fixed table in the driver that identifies the driver's supported instances.
+ * Its content is driver specific. The driver implementer must provide the content. The last entry
+ * must contain a NULL pointer in its name field.
  */
-extern char const *cwAsioDriverKey;
-
-/** The description string (UTF-8) for the driver.
- * This will be used in driver registration. Keep its length reasonable.
- */
-extern char const *cwAsioDriverDescription;
+extern struct cwASIOinstance const *cwAsioDriverInstances;
 
 /** Make an instance of the driver.
  * This function must be implemented by the driver to create an instance of the driver object and

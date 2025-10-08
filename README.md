@@ -415,9 +415,9 @@ a few global constants.
 On Windows, ASIO has always used GUIDs to unambiguously identify different
 drivers. This is part of the Microsoft Component Object Model (COM), which
 stipulates that both classes and interfaces are identified with a unique GUID,
-which is also used for discovery via the Microsoft Windows Registry. We use them
-in cwASIO forLinux, too, to a certain extent, in order to maintain a level of
-similarity between the systems.
+which is also used for discovery via the Microsoft Windows Registry. Under
+Linux, this functionality doesn't exist, and we have to come up with a scheme
+that identifies drivers in a similar way.
 
 A GUID is a 128-bit data structure that is defined and described in RFC 9562, or
 equivalently in ITU-T Rec. X.667. There is a binary representation and a textual
@@ -444,7 +444,7 @@ used in its textual representation as a Registry key without problems. When
 doing your own comparisons, however, be aware of this problem.
 
 In ASIO, the GUID that serves as the class ID to locate the driver on the
-system, does double duty as the interface ID when creating a driver instance.
+system, does double duty as the interface ID upon creating a driver instance.
 Those would normally be distinct GUIDs, but ASIO chose to simplify things. *(In
 theory, a class and an interface are not the same thing. A class may implement
 several different interfaces at the same time, and the interface ID would be
@@ -456,6 +456,11 @@ The bottomline is that a driver provider must generate a unique GUID for the
 driver, which is built into the driver code. This GUID is used in registering
 the driver with your system, usually as part of the driver installation process,
 and in creating a driver instance for use by an audio application.
+
+The possibility of multiinstance drivers creates an additional challenge here.
+Compatibility with Windows legacy host applications demands that they be
+registered with COM several times under distinct GUIDs. Each instance is
+responsible for a different audio device. We have more to say about this later.
 
 ## Installing the driver
 
@@ -501,10 +506,34 @@ version of the driver, you need to use the 32-bit version of `Regsrv32` utility.
 
 For the details, please refer to the documentation of `Regsrv32` by Microsoft.
 
+Calling `DllRegisterServer()` doesn't allow passing any parameters to it, which
+is OK when registering a driver that only supports one device. A multiinstance
+driver, however, needs to be installed several times, once for each device, with
+the driver DLL being common. In this case, the `DllRegisterServer` function
+needs to be able to tell which device is being installed, and likewise the
+`DllUnregisterServer` needs to know which one is being uninstalled. The way to
+tell those functions is via an environment variable named "CWASIO_INSTALL_NAME",
+which only needs to be set temporarily while the installer is running. The
+environment variable needs to be set to contain the name of the device to
+install or uninstall. The driver uses this in its `DllRegisterServer` and
+`DllUnregisterServer` functions to determine the registry entry it needs to act
+upon. If the environment variable is missing, it acts on the first (or only)
+device name it knows. Hence, the installer would set the environment variable
+before calling `DllRegisterServer` or `DllUnregisterServer`, and delete it after
+they return.
+
+Of course, the installer may add additional information to the registry entry
+that `DllRegisterServer` created. Most importantly, this would be the
+description entry that contains the text that would typically be shown to a user
+who wants to select a device from a list of available devices. While the name
+would be chosen from a hardcoded list defined by the driver, the description
+would be provided by the installer, possibly obtained from the device itself, or
+from user input.
+
 ### Installing on Linux
 
 The installation location of the driver on Linux will probably depend on the
-distribution you target. We don't prescribe anything here, you make your own
+distribution you address. We don't prescribe anything here, you make your own
 choices. Otherwise the process involves calling the function `registerDriver`
 during installation, and `unregisterDriver` during deinstallation. Those two
 functions take care of maintaining the entry in `/etc/cwASIO`. It is the job of
@@ -518,11 +547,13 @@ Note that `unregisterDriver` can't delete the subdirectory that `registerDriver`
 created, unless it is empty after deleting the files `driver` and `description`.
 Your installer or driver may create additional files in there, but when
 uninstalling, they should be deleted before calling `unregisterDriver`, except
-if you deliberately want to keep the directory.
+if you deliberately want to keep the directory. Both functions allow passing the
+registration name, so there is no need for setting an environment variable as
+under Windows in the case of multiinstance drivers.
 
 Of course, you must have the right to write to `/etc/cwASIO`, otherwise the
 calls to `registerDriver` or `unregisterDriver` will fail with an error
-indicating isufficient rights. Both functions return 0 on success, and an errno
+indicating insufficient rights. Both functions return 0 on success, and an errno
 in case of failure.
 
 ## Handling driver settings
