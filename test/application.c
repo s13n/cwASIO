@@ -22,11 +22,11 @@ struct Context {
 static bool callback(void *ctx, char const *name, char const *id, char const *descr) {
     struct Context *c = ctx;
     if(c && !c->id && strcmp(c->name, name) == 0) {
-        c->id = strdup(id);
-        c->descr = strdup(descr);
+        c->id = id ? strdup(id) : NULL;
+        c->descr = descr ? strdup(descr) : NULL;
     }
     if(!c)
-        printf("%s (%s): %s\n", name, id, descr ? descr : "");
+        printf("%s (%s): %s\n", name, id ? id : "", descr ? descr : "");
     return true;
 }
 
@@ -48,20 +48,23 @@ int main(int argc, char *argv[]) {
     struct cwASIODriver *drv = NULL;
     long err = cwASIOload(ctx.id, &drv);
     if(err != 0) {
-        printf("Couldn't instantiate! Error: %ld\n", err);
+        printf("Couldn't instantiate %s! Error: %ld\n", ctx.name, err);
         goto cleanup;
     }
     
     err = drv->lpVtbl->future(drv, kcwASIOsetInstanceName, ctx.name);
     switch(err) {
         case ASE_SUCCESS:
-            printf("Driver supports setting instance name.\n");
+            printf("Driver for %s supports setting instance name.\n", ctx.name);
+            break;
+        case ASE_NotPresent:
+            printf("Driver for %s can't find its settings.\n", ctx.name);
             break;
         case ASE_InvalidParameter:
-            printf("Driver doesn't support setting instance name.\n");
+            printf("Driver for %s doesn't support setting instance name.\n", ctx.name);
             break;
         default:
-            printf("Driver responds with a strange error code: %ld\n", err); 
+            printf("Driver for %s responds with a strange error code: %ld\n", ctx.name, err); 
             break;
     }
 
