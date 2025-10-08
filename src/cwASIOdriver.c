@@ -39,6 +39,27 @@
 * be implemented elsewhere (see the provided skeleton files).
 */
 
+// Find the name in our table of instances.
+static struct cwASIOinstance const *findName(char const *name) {
+    if (!name)
+        return cwAsioDriverInstances;       // first entry
+    for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
+        if (0 == strcmp(name, entry->name))
+            return entry;
+    }
+    return NULL;
+}
+
+// Find the GUID in our table of instances.
+static struct cwASIOinstance const *findGUID(cwASIOGUID const *objGuid) {
+    for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
+        if (cwASIOcompareGUID(objGuid, &entry->guid))
+            return entry;
+    }
+    return NULL;
+}
+
+
 #ifdef _WIN32
 /* On Windows, this scaffolding includes a COM compliant class factory, and a few functions that are exported
  * from the DLL, as defined in `cwASIOdriver.def`.
@@ -139,26 +160,6 @@ static struct ClassFactoryVtbl driverFactoryVtbl = {
 };
 
 static struct ClassFactory driverFactory = { &driverFactoryVtbl };
-
-// Find the name in our table of instances.
-static struct cwASIOinstance const *findName(char const *name) {
-    if (!name)
-        return cwAsioDriverInstances;       // first entry
-    for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
-        if (0 == strcmp(name, entry->name))
-            return entry;
-    }
-    return NULL;
-}
-
-// Find the GUID in our table of instances.
-static struct cwASIOinstance const *findGUID(cwASIOGUID const *objGuid) {
-    for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
-        if (cwASIOcompareGUID(objGuid, &entry->guid))
-            return entry;
-    }
-    return NULL;
-}
 
 MODULE_EXPORT HRESULT CWASIO_METHOD DllGetClassObject(cwASIOGUID const *objGuid, cwASIOGUID const *factoryGuid, void **factoryHandle) {
     // Check that the caller is passing one of our GUIDs. That's the COM object our DLL implements.
@@ -295,8 +296,11 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
  */
 MODULE_EXPORT int registerDriver(char const *name) {
     char buf[2048];
+    struct cwASIOinstance const *entry = findName(name);
+    if (!entry)
+        return ENODEV;
     //assemble the path
-    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", cwAsioDriverKey);
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", entry->name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
     //make the driver's registration directory
@@ -315,40 +319,30 @@ MODULE_EXPORT int registerDriver(char const *name) {
     close(fd);
     if(ret < 0)
         return err;
-    //write the "description" file under /etc/cwASIO/<key>
-    strcpy(buf+n, "/description");
-    fd = creat(buf, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
-    if(fd < 0)
-        return errno;
-    ret = write(fd, cwAsioDriverDescription, strlen(cwAsioDriverDescription));
-    err = errno;
-    close(fd);
-    if(ret < 0)
-        return err;
     return 0;
 }
 
 /** Remove registration info. This function removes what `registerDriver` has
  * added.
  *
- * Note that only the two files `driver` and `description` are removed. If the
- * directory isn't empty thereafter, it won't be removed, in order to preserve
- * any data that was added in a different way. If the caller wants to ensure
- * that the directory gets deleted, too, it needs to remove all other files
- * before calling this function.
- * 
+ * Note that only the file `driver` is removed. If the directory isn't empty
+ * thereafter, it won't be removed, in order to preserve any data that was added
+ * in a different way. If the caller wants to ensure that the directory gets
+ * deleted, too, it needs to remove all other files before calling this
+ * function.
+ *
  * The function returns 0 on success, otherwise it returns an errno value.
  */
 MODULE_EXPORT int unregisterDriver(char const *name) {
     char buf[2048];
+    struct cwASIOinstance const *entry = findName(name);
+    if (!entry)
+        return ENODEV;
     //assemble the path
-    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", cwAsioDriverKey);
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", entry->name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
 
-    strcpy(buf+n, "/description");
-    if( 0 != unlink(buf))
-        return errno;
     strcpy(buf+n, "/driver");
     if( 0 != unlink(buf))
         return errno;
