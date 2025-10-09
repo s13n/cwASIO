@@ -103,6 +103,10 @@ int main(int argc, char const *argv[]) {
         auto firstChanIndex = strtol(argv[2], nullptr, 10);
         std::filesystem::path filepath(argv[3]);
 
+        // tell the cwASIO driver that we are a modern app (knowing about multi instance drivers)
+        if(driver.future(kcwASIOsetInstanceName, (void*) argv[1]))
+            std::cout << "The chosen cwASIO driver \"" << argv[1] << "\" does NOT support multiple instances!\n";
+
         if(!driver.init(nullptr))
             throw std::runtime_error("Can't init driver " + driver.getDriverName() + " version "
                     + std::to_string(driver.getDriverVersion()) + ": " + driver.getErrorMessage());
