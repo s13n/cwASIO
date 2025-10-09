@@ -53,25 +53,17 @@ This uses the `FetchContent` module of CMake to fetch the cwASIO sources, and
 make them a part of the host application build.
 
 ## APIs
-### Compatible API
 
-The compatible API attempts to mimick the original ASIO C API closely, so that
-applications that have been built with the original ASIO SDK can change to
-cwASIO with minimal effort. This applies to the core API, not the OS-specific
-driver enumeration interface. This same API is also available on Linux.
-
-The compatible API is declared in `asio.h`. It holds hidden global state so
-the application can only have one driver loaded at any time, a restriction that
-it shares with the original ASIO SDK.
-
-This API is a thin C wrapper around the native API on each platform.
+There is a choice of three different APIs from which you can choose what suits
+you best, the native API, the C++ API and the compatible API.
 
 ### Native API
 
-You don't need to use the compatible API, there can be good reasons to use the
-native API. The most immediate benefit is the possibility of loading and using
-several drivers simultaneously. The native API is specific to cwASIO and is not
-meant to be a drop-in replacement for the original ASIO API.
+The native API allows you to make use of the extensions cwASIO offers over the
+ASIO SDK. The most immediate benefit is the possibility of loading and using
+several drivers simultaneously in a single application. The native API is
+specific to cwASIO and is not meant to be a drop-in replacement for the original
+ASIO API.
 
 The native API is close to identical on Linux and Windows, because on Linux the
 COM interface used on Windows is mimicked. The functionality is the same, so it
@@ -90,6 +82,19 @@ management, and more.
 This API is declared in `cwASIO.hpp`. Of course, you would omit the
 `extern "C" { ... }` brackets in this case.
 
+### Compatible API
+
+The compatible API attempts to mimick the original ASIO C API closely, so that
+applications that have been built with the original ASIO SDK can change to
+cwASIO with minimal effort. This applies to the core API, not the OS-specific
+driver enumeration interface. This same API is also available on Linux.
+
+The compatible API is declared in `asio.h`. It holds hidden global state so
+the application can only have one driver loaded at any time, a restriction that
+it shares with the original ASIO SDK.
+
+This API is a thin C wrapper around the native API on each platform.
+
 ## Enumerating devices
 
 Enumerating must be done with the native API, and is not compatible with the
@@ -106,7 +111,7 @@ the loading id is a CLSID, which is a GUID that can be resolved to the driver
 DLL to load. On Linux, the loading id is the path to the driver's shared object
 file.
 
-Note that you enumerate the installed drivers, not the audio devices that are
+Note that this enumerates the installed drivers, not the audio devices that are
 actually connected and ready to be used! Whether an audio device is present and
 operable can only be determined once its driver is loaded.
 
@@ -144,7 +149,9 @@ function, which does the following:
 Once the driver instance is created, it must be initialized with a call to its
 `init()` method. At that point, the driver typically checks if the hardware is
 present and functional, and if so initializes it. Thereafter, the driver should
-be functional.
+be functional. Multiinstance support also requires the `future()` function to be
+called before `init()`, see the example code and the description of
+multiinstance further below.
 
 There is one more complication on Windows: Applications can be 32-bit or 64-bit,
 and both may run on a 64-bit Windows host. Each of them needs its own driver,
@@ -259,7 +266,7 @@ offered for a long time by drivers of some manufacturers, notably MOTU and RME.
 
 This is the ability of an application to open more than one ASIO driver
 simultaneously. ASIO can support this, but not with the standard C API. The
-native API (in cwASIO represented by cwASIODriverVtbl) needs to be used
+native API (in cwASIO represented by `cwASIODriverVtbl`) needs to be used
 directly.
 
 The callbacks of the driver API present an additional difficulty here. They lack
@@ -267,13 +274,13 @@ a context parameter that would permit to distinguish between the drivers, so the
 application must use some trickery to identify the driver that called one of the
 callbacks.
 
-When using the native cwASIO API, an application can relatively easily support
-multiple driver instances concurrently. Bear in mind, however, what this means
-in practice: The application gets callback calls from multiple threads
-concurrently, at possibly different rates. It depends on the application whether
-that makes sense, and under what circumstances. Even if it does make sense, the
-application needs to be written such that this level of concurrency doesn't
-cause problems.
+When using the native cwASIO API, or the cwASIO C++ API, an application can
+relatively easily support multiple driver instances concurrently. Bear in mind,
+however, what this means in practice: The application gets callback calls from
+multiple threads concurrently, at possibly different rates. It depends on the
+application whether that makes sense, and under what circumstances. Even if it
+does make sense, the application needs to be written such that this level of
+concurrency doesn't cause problems.
 
 ### Multiinstance drivers
 
@@ -288,16 +295,18 @@ each other, i.e. they work from a common clock, and share the same settings.
 
 Loading the same driver separately for each of the devices, with individual
 settings for them, is hampered by the difficulty to enumerate and identify the
-different instances of the same driver. In theory, on Windows, there could be
-multiple entries under the `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` registry key, one
-for each hardware device, all using the same CLSID that leads to the same
-driver, i.e. to the same entry under the `HKEY_CLASSES_ROOT\CLSID` registry key.
-But the driver would need to know which of the several hardware devices it is
-supposed to take care of. Some additional information would need to be passed to
-the driver instance for allowing it to make that distinction, but ASIO doesn't
-define a mechanism for doing that.
+different instances of the same driver. On Windows, there could be multiple
+entries under the `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` registry key, one for each
+hardware device, all using the same CLSID that leads to the same driver, i.e. to
+the same entry under the `HKEY_CLASSES_ROOT\CLSID` registry key. But the driver
+would need to know which of the several hardware devices it is supposed to take
+care of. Some additional information would need to be passed to the driver
+instance for allowing it to make that distinction, but ASIO doesn't define a
+mechanism for doing that. Instead, the driver must be registered several times
+under different CLSIDs, which provide this means of distinction.
 
-An extension to ASIO is defined by cwASIO to make this possible:
+An extension to ASIO is defined by cwASIO to make this possible on both
+platforms:
 
 The `future()` method of the driver implements a new selector that allows
 passing the name of the subkey in `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` mentioned
@@ -305,8 +314,8 @@ above. The call would need to be made before the call to `init()`, which is
 implemented for the standard ASIO C API when you use the `ASIOLoad()` function
 of cwASIO. A driver that doesn't implement this, which includes all legacy
 drivers, would not understand this call and return an error code of
-`ASE_InvalidParameter`. `ASIOLoad()` treats this as success, as the driver has been
-successfully loaded, it just doesn't doesn't offer multiinstance support.
+`ASE_InvalidParameter`. `ASIOLoad()` treats this as success, as the driver has
+been successfully loaded, it just doesn't doesn't offer multiinstance support.
 
 A driver that understands the new selector would store the name passed. The
 subsequent `init()` call would use the stored name to distinguish between
@@ -325,10 +334,10 @@ to the `future()` call should have no effect and return `ASE_SUCCESS` if the
 driver offers multiinstance support. This may be used to check for multiinstance
 support without setting a name.
 
-For supporting legacy applications under Windows, there is also the possibility
-of registering the same driver under several different CLSID values, which get
+For supporting legacy applications under Windows, there the possibility of
+registering the same driver under several different CLSID values, which get
 passed to the driver on instantiation. This can be used to select a different
-default name for each CLSID passed.
+default name for each CLSID passed. See the provided example code.
 
 Note that there are four combinations involving host applications and drivers
 that may or may not support multiinstance:
