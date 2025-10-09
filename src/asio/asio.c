@@ -24,7 +24,7 @@ ASIOError ASIOLoad(char const *id, char const *name) {
         return err;
     }
     err = theAsioDriver->lpVtbl->future(theAsioDriver, kcwASIOsetInstanceName, (void *)name);
-    return err == ASE_SUCCESS ? ASE_OK : err;
+    return err == ASE_SUCCESS || err == ASE_InvalidParameter ? ASE_OK : err;
 }
 
 ASIOError ASIOUnload(void) {

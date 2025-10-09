@@ -305,8 +305,8 @@ above. The call would need to be made before the call to `init()`, which is
 implemented for the standard ASIO C API when you use the `ASIOLoad()` function
 of cwASIO. A driver that doesn't implement this, which includes all legacy
 drivers, would not understand this call and return an error code of
-`ASE_InvalidParameter`. When `ASIOLoad()` returns this, the driver has been
-successfully loaded, but doesn't offer multiinstance support.
+`ASE_InvalidParameter`. `ASIOLoad()` treats this as success, as the driver has been
+successfully loaded, it just doesn't doesn't offer multiinstance support.
 
 A driver that understands the new selector would store the name passed. The
 subsequent `init()` call would use the stored name to distinguish between
