@@ -2,7 +2,7 @@
  *  @brief      cwASIO driver support
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2023-2024
+ *  @date       2023-2025
  *  @copyright  See file LICENSE in toplevel directory
  * \addtogroup cwASIO
  *  @{
@@ -38,6 +38,27 @@
 * The scaffolding arranges for object instantiation, discovery and installation. The driver functionality must
 * be implemented elsewhere (see the provided skeleton files).
 */
+
+// Find the name in our table of instances.
+static struct cwASIOinstance const *findName(char const *name) {
+    if (!name)
+        return cwAsioDriverInstances;       // first entry
+    for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
+        if (0 == strcmp(name, entry->name))
+            return entry;
+    }
+    return NULL;
+}
+
+// Find the GUID in our table of instances.
+static struct cwASIOinstance const *findGUID(cwASIOGUID const *objGuid) {
+    for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
+        if (cwASIOcompareGUID(objGuid, &entry->guid))
+            return entry;
+    }
+    return NULL;
+}
+
 
 #ifdef _WIN32
 /* On Windows, this scaffolding includes a COM compliant class factory, and a few functions that are exported
@@ -141,8 +162,9 @@ static struct ClassFactoryVtbl driverFactoryVtbl = {
 static struct ClassFactory driverFactory = { &driverFactoryVtbl };
 
 MODULE_EXPORT HRESULT CWASIO_METHOD DllGetClassObject(cwASIOGUID const *objGuid, cwASIOGUID const *factoryGuid, void **factoryHandle) {
-    // Check that the caller is passing our GUID. That's the COM object our DLL implements.
-    if (cwASIOcompareGUID(objGuid, &cwAsioDriverCLSID)) {
+    // Check that the caller is passing one of our GUIDs. That's the COM object our DLL implements.
+    struct cwASIOinstance const *entry = findGUID(objGuid);
+    if (entry) {
         // Fill in the caller's handle with a pointer to our factory object. We'll let our queryInterface do that, because it also
         // checks the IClassFactory GUID and does other book-keeping.
         return queryInterface(&driverFactory, factoryGuid, factoryHandle);
@@ -186,13 +208,16 @@ enum {
  */
 MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     LSTATUS err = 0;
+    struct cwASIOinstance const *entry = findName(getenv("CWASIO_INSTALL_NAME"));
+    if (!entry)
+        return HRESULT_FROM_WIN32(ERROR_DEV_NOT_EXIST);
     //write the default value
     wchar_t buffer[buffersize];
-    int n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverDescription, -1, buffer, buffersize);
+    int n = MultiByteToWideChar(CP_UTF8, 0, entry->name, -1, buffer, buffersize);
     if(n <= 0)
         return HRESULT_FROM_WIN32(GetLastError());
     wchar_t subkey[subkeysize] = L"CLSID\\";
-    stringFromGUID(&cwAsioDriverCLSID, subkey + wcslen(subkey));    // append CLSID
+    stringFromGUID(&entry->guid, subkey + wcslen(subkey));    // append CLSID
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n));
     if (err)
         return HRESULT_FROM_WIN32(err);
@@ -214,20 +239,13 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the "CLSID" entry data under HKLM\SOFTWARE\ASIO\<key>
-    stringFromGUID(&cwAsioDriverCLSID, buffer);
+    stringFromGUID(&entry->guid, buffer);
     wcscpy(subkey, L"SOFTWARE\\ASIO\\");
     n = wcslen(subkey);     // remember length so far for appending
-    n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, subkeysize - n);      // append Key
+    n = MultiByteToWideChar(CP_UTF8, 0, entry->name, -1, subkey + n, subkeysize - n);      // append Key
     if(n <= 0)
         return HRESULT_FROM_WIN32(GetLastError());
     err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", REG_SZ, buffer, sizeInChars(buffer));
-    if (err)
-        return HRESULT_FROM_WIN32(err);
-    //write the "Description" entry data under HKLM\SOFTWARE\ASIO\<key>
-    n = MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverDescription, -1, buffer, buffersize);
-    if(n <= 0)
-        return HRESULT_FROM_WIN32(GetLastError());
-    err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"Description", REG_SZ, buffer, sizeInChars(buffer));
     return HRESULT_FROM_WIN32(err);
 }
 
@@ -236,24 +254,24 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
  */
 MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
     LSTATUS err = 0;
+    struct cwASIOinstance const *entry = findName(getenv("CWASIO_INSTALL_NAME"));
+    if (!entry)
+        return HRESULT_FROM_WIN32(ERROR_DEV_NOT_EXIST);
     //remove the entire tree in HKLM\SOFTWARE\ASIO
     wchar_t subkey[subkeysize] = L"SOFTWARE\\ASIO\\";
     int n = wcslen(subkey);     // remember length so far for appending
-    MultiByteToWideChar(CP_UTF8, 0, cwAsioDriverKey, -1, subkey + n, subkeysize - n);      // append Key
+    MultiByteToWideChar(CP_UTF8, 0, entry->name, -1, subkey + n, subkeysize - n);      // append Key
     err = RegDeleteTreeW(HKEY_LOCAL_MACHINE, subkey);
     if (err)
         return HRESULT_FROM_WIN32(err);
     //remove the entire tree in HKCR\clsid
     wcscpy(subkey, L"CLSID\\");
-    stringFromGUID(&cwAsioDriverCLSID, subkey + wcslen(subkey));    // append CLSID
+    stringFromGUID(&entry->guid, subkey + wcslen(subkey));    // append CLSID
     err = RegDeleteTreeW(HKEY_CLASSES_ROOT, subkey);
     return HRESULT_FROM_WIN32(err);
 }
 
 #else // not _WIN32
-
-/* On Linux TBD
- */
 
 /** Put registration info into /etc/cwASIO.
  *
@@ -262,16 +280,24 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
  * the path to the driver from the running module, so the installer should put
  * the driver shared object into its final place before loading it and calling
  * this function.
- * 
+ *
  * Note that the `/etc/cwASIO` directory must exist and be writable, please
  * ensure that before calling this function, otherwise this function fails.
- * 
+ *
+ * The name parameter should contain the name under which the driver should be
+ * registered, i.e. the name of the directory within `/etc/cwASIO`. It may be
+ * NULL, in which case the first name will be chosen from the list of those
+ * supported.
+ *
  * The function returns 0 on success, otherwise it returns an errno value.
  */
-MODULE_EXPORT int registerDriver(void) {
+MODULE_EXPORT int registerDriver(char const *name) {
     char buf[2048];
+    struct cwASIOinstance const *entry = findName(name);
+    if (!entry)
+        return ENODEV;
     //assemble the path
-    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", cwAsioDriverKey);
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", entry->name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
     //make the driver's registration directory
@@ -290,40 +316,30 @@ MODULE_EXPORT int registerDriver(void) {
     close(fd);
     if(ret < 0)
         return err;
-    //write the "description" file under /etc/cwASIO/<key>
-    strcpy(buf+n, "/description");
-    fd = creat(buf, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
-    if(fd < 0)
-        return errno;
-    ret = write(fd, cwAsioDriverDescription, strlen(cwAsioDriverDescription));
-    err = errno;
-    close(fd);
-    if(ret < 0)
-        return err;
     return 0;
 }
 
 /** Remove registration info. This function removes what `registerDriver` has
  * added.
  *
- * Note that only the two files `driver` and `description` are removed. If the
- * directory isn't empty thereafter, it won't be removed, in order to preserve
- * any data that was added in a different way. If the caller wants to ensure
- * that the directory gets deleted, too, it needs to remove all other files
- * before calling this function.
- * 
+ * Note that only the file `driver` is removed. If the directory isn't empty
+ * thereafter, it won't be removed, in order to preserve any data that was added
+ * in a different way. If the caller wants to ensure that the directory gets
+ * deleted, too, it needs to remove all other files before calling this
+ * function.
+ *
  * The function returns 0 on success, otherwise it returns an errno value.
  */
-MODULE_EXPORT int unregisterDriver(void) {
+MODULE_EXPORT int unregisterDriver(char const *name) {
     char buf[2048];
+    struct cwASIOinstance const *entry = findName(name);
+    if (!entry)
+        return ENODEV;
     //assemble the path
-    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", cwAsioDriverKey);
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", entry->name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
 
-    strcpy(buf+n, "/description");
-    if( 0 != unlink(buf))
-        return errno;
     strcpy(buf+n, "/driver");
     if( 0 != unlink(buf))
         return errno;
@@ -359,16 +375,16 @@ static void *getLibraryHandle(void) {
     return NULL;
 }
 
-MODULE_EXPORT struct cwASIODriver *instantiateDriver(cwASIOGUID const *guid) {
+MODULE_EXPORT struct cwASIODriver *instantiateDriver(void) {
     // Create our instance.
     struct cwASIODriver *obj = makeAsioDriver();
     if (!obj)
         return NULL;
 
     void *ifc;
-    // Let cwAsioDriver's QueryInterface check the GUID and set the pointer.
+    // Let cwAsioDriver's QueryInterface set the pointer.
     // It also increments the reference count (to 2) if all goes well.
-    long hr = obj->lpVtbl->queryInterface(obj, guid, &ifc);
+    long hr = obj->lpVtbl->queryInterface(obj, NULL, &ifc);
 
     // NOTE: If there was an error in QueryInterface(), then Release() will be decrementing
     // the count back to 0 and will delete the instance for us. One error that may occur is

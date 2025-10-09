@@ -179,7 +179,7 @@ int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned
 
 #else
 
-typedef struct cwASIODriver * (CWASIO_METHOD InstantiateDriver)(cwASIOGUID const *);
+typedef struct cwASIODriver * (CWASIO_METHOD InstantiateDriver)(void);
 
 long cwASIOload(char const *id, struct cwASIODriver **drv) {
     void *lib = dlopen(id, RTLD_LOCAL | RTLD_NOW);
@@ -190,8 +190,7 @@ long cwASIOload(char const *id, struct cwASIODriver **drv) {
     if (!instantiateDriver)
         return ASE_NotPresent;
 
-    // Under Linux, we pass a NULL for the interface ID; we don't need to check it.
-    *drv = instantiateDriver(NULL);
+    *drv = instantiateDriver();
 
     return *drv ? ASE_OK : ASE_NotPresent;
 }

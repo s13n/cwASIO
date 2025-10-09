@@ -13,7 +13,6 @@
 #include <cassert>
 #include <csignal>
 #include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -99,7 +98,7 @@ int main(int argc, char const *argv[]) {
 
     try {
         std::error_code ec;
-        cwASIO::Driver driver(getDriverId(argv[1]));
+        cwASIO::Driver driver(getDriverId(argv[1]), argv[1]);
         auto firstChanIndex = strtol(argv[2], nullptr, 10);
         std::filesystem::path filepath(argv[3]);
 
@@ -138,7 +137,7 @@ int main(int argc, char const *argv[]) {
             throw std::system_error(ec, "when reading sampling rate");
 
         WaveFile file;
-        std::string res = file.open(filepath.c_str());
+        std::string res = file.open(filepath);
         if (!res.empty())
             throw std::runtime_error(res);
 

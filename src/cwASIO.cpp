@@ -31,7 +31,7 @@ std::string cwASIO::Errc_category::message(int c) const {
 }
 
 
-cwASIO::Driver::Driver(std::string id)
+cwASIO::Driver::Driver(std::string id, std::string name)
     : drv_{ nullptr }
 {
     auto err = cwASIOload(id.c_str(), &drv_);
@@ -41,8 +41,10 @@ cwASIO::Driver::Driver(std::string id)
 #else
         std::error_code ec(err, err_category());
 #endif
-        throw std::system_error(ec, "can't load cwASIO driver " + id);
+        throw std::system_error(ec, "can't load cwASIO driver " + name + " (" + id + ")");
     }
+
+    err = future(kcwASIOsetInstanceName, const_cast<char*>(name.c_str()));
 }
 
 std::string cwASIO::Driver::getDriverName() {

@@ -2,7 +2,7 @@
  *  @brief      cwASIO driver support
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2023-2024
+ *  @date       2023-2025
  *  @copyright  See file LICENSE in toplevel directory
  */
 #pragma once
@@ -13,25 +13,40 @@
 // ... (add here any further includes you may need)
 
 
-// Initialize the following data constants with the values for your driver.
-cwASIOGUID const cwAsioDriverCLSID = {0x00000000,0x0000,0x0000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-char const *cwAsioDriverKey = "";
-char const *cwAsioDriverDescription = "";
+// Initialize the following table with the values for your driver.
+// Note that the names are limited to a maximum length of 32 characters including the terminating nullbyte.
+struct cwASIOinstance const cwAsioDriverInstances[] = {
+    { .name = "Instance #1", .guid = {0x00000000,0x0000,0x0000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00} },
+    // ... more instances can follow here, each with their own name and GUID
+    { .name = NULL }        // this terminates the list and must always be there.
+};
 
 
 /** Your driver implemented as a C struct. */
 struct MyAsioDriver {
     struct cwASIODriver base;   // must be the first struct member
     atomic_ulong references;    // threadsafe reference counter
+    struct cwASIOinstance const *instance;  // which instance was selected
     // ... (more data members here)
 };
 
 static long CWASIO_METHOD queryInterface(struct cwASIODriver *drv, cwASIOGUID const *guid, void **ptr) {
-    if (!cwASIOcompareGUID(guid, &cwAsioDriverCLSID)) {
-        *ptr = NULL;
-        return E_NOINTERFACE;
+    if (guid) {     // This is only non-null on Windows
+        long err = E_NOINTERFACE;
+        // find guid in our instance table
+        for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
+            if (cwASIOcompareGUID(guid, &entry->guid)) {
+                struct MyAsioDriver *self = drv;
+                self->instance = entry;
+                err = 0;     // success
+                break;
+            }
+        }
+        if (err) {
+            *ptr = NULL;
+            return err;     // none of our guids
+        }
     }
-    // It's our GUID
     *ptr = drv;
     drv->lpVtbl->addRef(drv);
     return 0;       // success
@@ -62,7 +77,8 @@ static cwASIOBool CWASIO_METHOD init(struct cwASIODriver *drv, void *sys) {
 
 static void CWASIO_METHOD getDriverName(struct cwASIODriver *drv, char *buf) {
     struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
-    // ... (insert your code here)
+    if (buf)
+        strcpy(buf, self->instance->name);
 }
 
 static long CWASIO_METHOD getDriverVersion(struct cwASIODriver *drv) {
@@ -168,7 +184,21 @@ static cwASIOError CWASIO_METHOD controlPanel(struct cwASIODriver *drv) {
 
 static cwASIOError CWASIO_METHOD future(struct cwASIODriver *drv, long sel, void *par) {
     struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
-    // ... (insert your code here)
+    switch (sel) {
+    // ... (insert code for your other cases here)
+    case kcwASIOsetInstanceName:
+        for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
+            if (0 == strcmp((char const *)par, entry->name)) {
+                if (0 != cwASIOgetParameter(entry->name, NULL, NULL, 0))
+                    break;      // not registered
+                self->instance = entry;
+                return ASE_SUCCESS;
+            }
+        }
+        return ASE_NotPresent;
+    default:
+        return ASE_InvalidParameter;
+    }
     return ASE_OK;
 }
 
@@ -206,11 +236,12 @@ struct cwASIODriverVtbl const myAsioDriverVtbl = {
 };
 
 struct cwASIODriver *makeAsioDriver() {
-    struct MyAsioDriver *instance = malloc(sizeof(struct MyAsioDriver));
-    if(!instance)
+    struct MyAsioDriver *obj = malloc(sizeof(struct MyAsioDriver));
+    if(!obj)
         return NULL;     // lack of sufficient memory
-    instance->base.lpVtbl = &myAsioDriverVtbl;
-    atomic_init(&instance->references, 0);
+    obj->base.lpVtbl = &myAsioDriverVtbl;
+    atomic_init(&obj->references, 1);
+    obj->instance = cwAsioDriverInstances;      // first entry
     // .... (you may do some more member initialization here)
-    return &instance->base;
+    return &obj->base;
 }

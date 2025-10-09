@@ -53,25 +53,17 @@ This uses the `FetchContent` module of CMake to fetch the cwASIO sources, and
 make them a part of the host application build.
 
 ## APIs
-### Compatible API
 
-The compatible API attempts to mimick the original ASIO C API closely, so that
-applications that have been built with the original ASIO SDK can change to
-cwASIO with minimal effort. This applies to the core API, not the OS-specific
-driver enumeration interface. This same API is also available on Linux.
-
-The compatible API is declared in `asio.h`. It holds hidden global state so
-the application can only have one driver loaded at any time, a restriction that
-it shares with the original ASIO SDK.
-
-This API is a thin C wrapper around the native API on each platform.
+There is a choice of three different APIs from which you can choose what suits
+you best, the native API, the C++ API and the compatible API.
 
 ### Native API
 
-You don't need to use the compatible API, there can be good reasons to use the
-native API. The most immediate benefit is the possibility of loading and using
-several drivers simultaneously. The native API is specific to cwASIO and is not
-meant to be a drop-in replacement for the original ASIO API.
+The native API allows you to make use of the extensions cwASIO offers over the
+ASIO SDK. The most immediate benefit is the possibility of loading and using
+several drivers simultaneously in a single application. The native API is
+specific to cwASIO and is not meant to be a drop-in replacement for the original
+ASIO API.
 
 The native API is close to identical on Linux and Windows, because on Linux the
 COM interface used on Windows is mimicked. The functionality is the same, so it
@@ -90,6 +82,19 @@ management, and more.
 This API is declared in `cwASIO.hpp`. Of course, you would omit the
 `extern "C" { ... }` brackets in this case.
 
+### Compatible API
+
+The compatible API attempts to mimick the original ASIO C API closely, so that
+applications that have been built with the original ASIO SDK can change to
+cwASIO with minimal effort. This applies to the core API, not the OS-specific
+driver enumeration interface. This same API is also available on Linux.
+
+The compatible API is declared in `asio.h`. It holds hidden global state so
+the application can only have one driver loaded at any time, a restriction that
+it shares with the original ASIO SDK.
+
+This API is a thin C wrapper around the native API on each platform.
+
 ## Enumerating devices
 
 Enumerating must be done with the native API, and is not compatible with the
@@ -106,7 +111,7 @@ the loading id is a CLSID, which is a GUID that can be resolved to the driver
 DLL to load. On Linux, the loading id is the path to the driver's shared object
 file.
 
-Note that you enumerate the installed drivers, not the audio devices that are
+Note that this enumerates the installed drivers, not the audio devices that are
 actually connected and ready to be used! Whether an audio device is present and
 operable can only be determined once its driver is loaded.
 
@@ -144,7 +149,9 @@ function, which does the following:
 Once the driver instance is created, it must be initialized with a call to its
 `init()` method. At that point, the driver typically checks if the hardware is
 present and functional, and if so initializes it. Thereafter, the driver should
-be functional.
+be functional. Multiinstance support also requires the `future()` function to be
+called before `init()`, see the example code and the description of
+multiinstance further below.
 
 There is one more complication on Windows: Applications can be 32-bit or 64-bit,
 and both may run on a 64-bit Windows host. Each of them needs its own driver,
@@ -259,7 +266,7 @@ offered for a long time by drivers of some manufacturers, notably MOTU and RME.
 
 This is the ability of an application to open more than one ASIO driver
 simultaneously. ASIO can support this, but not with the standard C API. The
-native API (in cwASIO represented by cwASIODriverVtbl) needs to be used
+native API (in cwASIO represented by `cwASIODriverVtbl`) needs to be used
 directly.
 
 The callbacks of the driver API present an additional difficulty here. They lack
@@ -267,13 +274,13 @@ a context parameter that would permit to distinguish between the drivers, so the
 application must use some trickery to identify the driver that called one of the
 callbacks.
 
-When using the native cwASIO API, an application can relatively easily support
-multiple driver instances concurrently. Bear in mind, however, what this means
-in practice: The application gets callback calls from multiple threads
-concurrently, at possibly different rates. It depends on the application whether
-that makes sense, and under what circumstances. Even if it does make sense, the
-application needs to be written such that this level of concurrency doesn't
-cause problems.
+When using the native cwASIO API, or the cwASIO C++ API, an application can
+relatively easily support multiple driver instances concurrently. Bear in mind,
+however, what this means in practice: The application gets callback calls from
+multiple threads concurrently, at possibly different rates. It depends on the
+application whether that makes sense, and under what circumstances. Even if it
+does make sense, the application needs to be written such that this level of
+concurrency doesn't cause problems.
 
 ### Multiinstance drivers
 
@@ -288,16 +295,18 @@ each other, i.e. they work from a common clock, and share the same settings.
 
 Loading the same driver separately for each of the devices, with individual
 settings for them, is hampered by the difficulty to enumerate and identify the
-different instances of the same driver. In theory, on Windows, there could be
-multiple entries under the `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` registry key, one
-for each hardware device, all using the same CLSID that leads to the same
-driver, i.e. to the same entry under the `HKEY_CLASSES_ROOT\CLSID` registry key.
-But the driver would need to know which of the several hardware devices it is
-supposed to take care of. Some additional information would need to be passed to
-the driver instance for allowing it to make that distinction, but ASIO doesn't
-define a mechanism for doing that.
+different instances of the same driver. On Windows, there could be multiple
+entries under the `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` registry key, one for each
+hardware device, all using the same CLSID that leads to the same driver, i.e. to
+the same entry under the `HKEY_CLASSES_ROOT\CLSID` registry key. But the driver
+would need to know which of the several hardware devices it is supposed to take
+care of. Some additional information would need to be passed to the driver
+instance for allowing it to make that distinction, but ASIO doesn't define a
+mechanism for doing that. Instead, the driver must be registered several times
+under different CLSIDs, which provide this means of distinction.
 
-An extension to ASIO is defined by cwASIO to make this possible:
+An extension to ASIO is defined by cwASIO to make this possible on both
+platforms:
 
 The `future()` method of the driver implements a new selector that allows
 passing the name of the subkey in `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` mentioned
@@ -305,15 +314,14 @@ above. The call would need to be made before the call to `init()`, which is
 implemented for the standard ASIO C API when you use the `ASIOLoad()` function
 of cwASIO. A driver that doesn't implement this, which includes all legacy
 drivers, would not understand this call and return an error code of
-`ASE_InvalidParameter`. When `ASIOLoad()` returns this, the driver has been
-successfully loaded, but doesn't offer multiinstance support.
+`ASE_InvalidParameter`. `ASIOLoad()` treats this as success, as the driver has
+been successfully loaded, it just doesn't doesn't offer multiinstance support.
 
 A driver that understands the new selector would store the name passed. The
 subsequent `init()` call would use the stored name to distinguish between
 different hardware devices, and to locate any further information specific to
 the hardware device in the registry. If no `future()` call was made before
-calling `init()`, no name is known, and the driver has to make an intelligent
-choice by itself.
+calling `init()`, no name is known, and the driver has to use a default name.
 
 Calling `future()` with the new selector `kcwASIOsetInstanceName` will be
 answered with `ASE_InvalidParameter` by a driver that offers no multiinstance
@@ -325,6 +333,50 @@ presence of the hardware device itself. Providing an empty name string (or NULL)
 to the `future()` call should have no effect and return `ASE_SUCCESS` if the
 driver offers multiinstance support. This may be used to check for multiinstance
 support without setting a name.
+
+For supporting legacy applications under Windows, there the possibility of
+registering the same driver under several different CLSID values, which get
+passed to the driver on instantiation. This can be used to select a different
+default name for each CLSID passed. See the provided example code.
+
+Note that there are four combinations involving host applications and drivers
+that may or may not support multiinstance:
+
+1. Legacy application uses legacy driver (on Windows only).\
+   Only a single instance of the driver can be used, and only one entry in the
+   registry can be created for the driver. That entry will have the default name
+   of the driver, which can't be changed, because the driver won't understand
+   the `future()` call to change it. The legacy application won't set the name
+   with `future()` anyway.
+2. Legacy application uses cwASIO driver (on Windows only).\
+   The driver may control more than one device, and there is a registry entry
+   for each. The legacy application can enumerate them in the normal way. The
+   legacy application won't use `future()` to set the instance name, so the
+   driver will have to use a different default name for each instance. The way
+   to do that is by using different CLSID entries in each registry entry, i.e.
+   to register in COM the same driver DLL under several different CLSID values.
+   The driver needs to have a built-in table that maps those CLSID values to
+   default names. It would be up to the driver manufacturer to come up with a
+   fixed list of CLSIDs for as many parallel instances as the driver is supposed
+   to support. On driver instantiation, the CLSID that the application has
+   chosen is passed to the queryInterface() function of the driver as the IID,
+   so the driver has a chance to choose the appropriate default name based on
+   the passed GUID.
+3. cwASIO application uses legacy driver (on Windows only).\
+   The driver will only offer one device, i.e. one registry entry, and it won't
+   support the setting of an instance name through `future()`. The application,
+   which will try to set the name with a call to `future()`, will receive an
+   error, telling it that it is working with a legacy driver.
+4. cwASIO application uses cwASIO driver (on all platforms).\
+   There can be multiple registry entries for one driver, corresponding to
+   multiple devices. The application instantiates one, and then sets its name
+   with `future()`. On Windows, the driver would have chosen the appropriate
+   default name via the IID already, so the call to `future()` would not change
+   anything, except telling the driver that the application is not a legacy
+   application (if that's something the driver would wish to know). On Linux, no
+   IID is used, and the application can't be legacy, as this doesn't exist on
+   Linux. In fact, on Linux, the call to `future()` to set the instance name is
+   mandatory before calling `init()`.
 
 ### Multiclient drivers
 
@@ -372,9 +424,9 @@ a few global constants.
 On Windows, ASIO has always used GUIDs to unambiguously identify different
 drivers. This is part of the Microsoft Component Object Model (COM), which
 stipulates that both classes and interfaces are identified with a unique GUID,
-which is also used for discovery via the Microsoft Windows Registry. We use them
-in cwASIO forLinux, too, to a certain extent, in order to maintain a level of
-similarity between the systems.
+which is also used for discovery via the Microsoft Windows Registry. Under
+Linux, this functionality doesn't exist, and we have to come up with a scheme
+that identifies drivers in a similar way.
 
 A GUID is a 128-bit data structure that is defined and described in RFC 9562, or
 equivalently in ITU-T Rec. X.667. There is a binary representation and a textual
@@ -401,7 +453,7 @@ used in its textual representation as a Registry key without problems. When
 doing your own comparisons, however, be aware of this problem.
 
 In ASIO, the GUID that serves as the class ID to locate the driver on the
-system, does double duty as the interface ID when creating a driver instance.
+system, does double duty as the interface ID upon creating a driver instance.
 Those would normally be distinct GUIDs, but ASIO chose to simplify things. *(In
 theory, a class and an interface are not the same thing. A class may implement
 several different interfaces at the same time, and the interface ID would be
@@ -413,6 +465,11 @@ The bottomline is that a driver provider must generate a unique GUID for the
 driver, which is built into the driver code. This GUID is used in registering
 the driver with your system, usually as part of the driver installation process,
 and in creating a driver instance for use by an audio application.
+
+The possibility of multiinstance drivers creates an additional challenge here.
+Compatibility with Windows legacy host applications demands that they be
+registered with COM several times under distinct GUIDs. Each instance is
+responsible for a different audio device. We have more to say about this later.
 
 ## Installing the driver
 
@@ -458,10 +515,34 @@ version of the driver, you need to use the 32-bit version of `Regsrv32` utility.
 
 For the details, please refer to the documentation of `Regsrv32` by Microsoft.
 
+Calling `DllRegisterServer()` doesn't allow passing any parameters to it, which
+is OK when registering a driver that only supports one device. A multiinstance
+driver, however, needs to be installed several times, once for each device, with
+the driver DLL being common. In this case, the `DllRegisterServer` function
+needs to be able to tell which device is being installed, and likewise the
+`DllUnregisterServer` needs to know which one is being uninstalled. The way to
+tell those functions is via an environment variable named "CWASIO_INSTALL_NAME",
+which only needs to be set temporarily while the installer is running. The
+environment variable needs to be set to contain the name of the device to
+install or uninstall. The driver uses this in its `DllRegisterServer` and
+`DllUnregisterServer` functions to determine the registry entry it needs to act
+upon. If the environment variable is missing, it acts on the first (or only)
+device name it knows. Hence, the installer would set the environment variable
+before calling `DllRegisterServer` or `DllUnregisterServer`, and delete it after
+they return.
+
+Of course, the installer may add additional information to the registry entry
+that `DllRegisterServer` created. Most importantly, this would be the
+description entry that contains the text that would typically be shown to a user
+who wants to select a device from a list of available devices. While the name
+would be chosen from a hardcoded list defined by the driver, the description
+would be provided by the installer, possibly obtained from the device itself, or
+from user input.
+
 ### Installing on Linux
 
 The installation location of the driver on Linux will probably depend on the
-distribution you target. We don't prescribe anything here, you make your own
+distribution you address. We don't prescribe anything here, you make your own
 choices. Otherwise the process involves calling the function `registerDriver`
 during installation, and `unregisterDriver` during deinstallation. Those two
 functions take care of maintaining the entry in `/etc/cwASIO`. It is the job of
@@ -475,9 +556,61 @@ Note that `unregisterDriver` can't delete the subdirectory that `registerDriver`
 created, unless it is empty after deleting the files `driver` and `description`.
 Your installer or driver may create additional files in there, but when
 uninstalling, they should be deleted before calling `unregisterDriver`, except
-if you deliberately want to keep the directory.
+if you deliberately want to keep the directory. Both functions allow passing the
+registration name, so there is no need for setting an environment variable as
+under Windows in the case of multiinstance drivers.
 
 Of course, you must have the right to write to `/etc/cwASIO`, otherwise the
 calls to `registerDriver` or `unregisterDriver` will fail with an error
-indicating isufficient rights. Both functions return 0 on success, and an errno
+indicating insufficient rights. Both functions return 0 on success, and an errno
 in case of failure.
+
+## Handling driver settings
+
+A driver will likely have to store device specific settings, and read them when
+starting up. In case of a multiinstance driver, the location will differ between
+different devices the driver controls. A driver that supports only one instance
+will use a single, fixed location. See the description above of multiinstance
+drivers.
+
+It is up to the driver writer to define where those settings are stored. There
+is nothing ASIO or cwASIO defines here. Your driver may want to store settings
+per user, per hardware configuration, per device or per driver, or any
+combination thereof. The driver implements this all by itself, with no
+particular cwASIO support.
+
+However, a few things must be borne in mind here in conjunction with cwASIO. The
+most intuitive location for storing device-specific settings is in the same
+place where the devices are listed for enumeration, i.e. in the Windows
+Registry, or in `/etc/cwASIO` on Linux, which is why there is support for it
+with the function `cwASIOgetParameter()`, defined in `cwASIO.h`, which can be
+used to retrieve entries from the same place where the driver is registered.
+They would have been placed there on installation, and the function provides an
+easy way for an application or driver to retrieve them. For user specific
+settings, there is the possibility to store them in files in the user's home
+directory, where the appropriate access rights are in force, or (on Windows) in
+a registry place where the user has write access. For those there's no direct
+cwASIO support.
+
+If the driver doesn't support multiinstance, it must have the name hardcoded,
+under which the entry in the registry is found (we call it the default name). A
+multiinstance driver permits overriding the default name with the `future()`
+call described above. This means that reading the settings should be done by the
+`init()` function, because only then the driver instance knows its name, which
+it will need to locate the proper settings. The `init()` function also has the
+ability to report any errors that were encountered while reading the settings,
+and applying them to the device.
+
+The prerequisite for this to work is that the driver instance uses the same name
+under which the device is listed in the registry. Thus, the host application
+must pass the exact name to the driver with the `future()` call, under which it
+found the driver during enumeration. The driver should check in the `future()`
+call if the registry contains an entry for this name, but it should leave the
+reading of the settings to the `init()` function.
+
+The driver should report back in `getDriverName()` the same name that was set
+with the `future()` call, if that was successful. Otherwise it should report
+back the default name.
+
+To see an example how the host application is supposed to handle this, refer to
+`test/application.c`.
