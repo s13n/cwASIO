@@ -107,11 +107,11 @@ int main(int argc, char const *argv[]) {
             throw std::runtime_error("Can't init driver " + driver.getDriverName() + " version "
                     + std::to_string(driver.getDriverVersion()) + ": " + driver.getErrorMessage());
 
-        auto [numInputChannels, _] = driver.getChannels(ec);
+        auto [_, numOutputChannels] = driver.getChannels(ec);
         if(ec)
             throw std::system_error(ec, "when reading number of channels");
-        if(firstChanIndex + 2 > numInputChannels)
-            throw std::runtime_error("not enough input channels");
+        if(firstChanIndex + 2 > numOutputChannels)
+            throw std::runtime_error("not enough output channels");
 
         auto [_0, _1, preferredSize, _2] = driver.getBufferSize(ec);
         if(ec)
