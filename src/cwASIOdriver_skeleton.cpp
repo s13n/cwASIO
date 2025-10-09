@@ -10,14 +10,18 @@ extern "C" {
     #include "cwASIOdriver.h"
 }
 #include <atomic>
+#include <cstring>
 #include <exception>
 // ... (add here any further includes you may need)
 
 
-// Initialize the following data constants with the values for your driver.
-cwASIOGUID const cwAsioDriverCLSID = {/*0x________,0x____,0x____,0x__,0x__,0x__,0x__,0x__,0x__,0x__,0x__*/};
-char const *cwAsioDriverKey = "";
-char const *cwAsioDriverDescription = "";
+// Initialize the following table with the values for your driver.
+// Note that the names are limited to a maximum length of 32 characters including the terminating nullbyte.
+struct cwASIOinstance const instanceTable[] = {
+    { .name = "Instance #1", .guid = {0x00000000,0x0000,0x0000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00} },
+    // ... more instances can follow here, each with their own name and GUID
+    { .name = NULL }        // this terminates the list and must always be there.
+};
 
 std::atomic_uint activeInstances = 0;
 
@@ -29,22 +33,25 @@ public:
     MyAsioDriver()
         : cwASIODriver{ &vtbl }
         , references{1}
+        , instance{instanceTable}   // first entry
         // .... (you may do some more member initialization here)
     {
     }
 
     long queryInterface(cwASIOGUID const *guid, void **ptr) {
         if (guid) {     // This is only non-null on Windows
-            // For a multiinstance driver on Windows, we have the opportunity here
-            // to set different default names depending on the guid passed. The
-            // driver must define multiple guids instead of just one, and register
-            // itself with Windows COM under each of them. Each of them would
-            // correspond with a default name, which would then reported via
-            // getDriverName(). In this example, we just support one guid and one
-            // name. Otherwise the following `if` would become a loop.
-            if (!cwASIOcompareGUID(guid, &cwAsioDriverCLSID)) {
-                *ptr = nullptr;
-                return E_NOINTERFACE;
+            long err = E_NOINTERFACE;
+            // find guid in our instance table
+            for (struct cwASIOinstance const *entry = instanceTable; entry->name; ++entry) {
+                if (cwASIOcompareGUID(guid, &entry->guid)) {
+                    instance = entry;
+                    err = 0;     // success
+                    break;
+                }
+            }
+            if (err) {
+                *ptr = NULL;
+                return err;     // none of our guids
             }
         }
         // It's our GUID
@@ -162,7 +169,21 @@ public:
     }
 
     cwASIOError future(long sel, void *par) {
-        // ... (insert your code here)
+        switch (sel) {
+        // ... (insert code for your other cases here)
+        case kcwASIOsetInstanceName:
+            for (struct cwASIOinstance const *entry = instanceTable; entry->name; ++entry) {
+                if (0 == strcmp(static_cast<char const *>(par), entry->name)) {
+                    instance = entry;
+                    if (0 == cwASIOgetParameter(entry->name, NULL, NULL, 0))
+                        return ASE_SUCCESS;
+                    break;
+                }
+            }
+            return ASE_NotPresent;
+        default:
+            return ASE_InvalidParameter;
+        }
         return ASE_OK;
     }
 
@@ -175,6 +196,7 @@ private:
     static struct cwASIODriverVtbl const vtbl;
 
     std::atomic_ulong references;    // threadsafe reference counter
+    struct cwASIOinstance const *instance;  // which instance was selected
     // ... (more data members here)
 };
 
