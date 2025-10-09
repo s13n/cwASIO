@@ -81,7 +81,8 @@ public:
     }
 
     void getDriverName(char *buf) {
-        // ... (insert your code here)
+        if (instance && buf)
+            strcpy(buf, instance->name);
     }
 
     long getDriverVersion() {

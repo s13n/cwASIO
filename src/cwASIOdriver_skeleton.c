@@ -77,7 +77,7 @@ static cwASIOBool CWASIO_METHOD init(struct cwASIODriver *drv, void *sys) {
 
 static void CWASIO_METHOD getDriverName(struct cwASIODriver *drv, char *buf) {
     struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
-    if (buf)
+    if (self && self->instance && buf)
         strcpy(buf, self->instance->name);
 }
 
