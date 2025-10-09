@@ -43,7 +43,7 @@ struct cwASIOinstance {
  * Its content is driver specific. The driver implementer must provide the content. The last entry
  * must contain a NULL pointer in its name field.
  */
-extern struct cwASIOinstance const *cwAsioDriverInstances;
+extern struct cwASIOinstance const cwAsioDriverInstances[];
 
 /** Make an instance of the driver.
  * This function must be implemented by the driver to create an instance of the driver object and

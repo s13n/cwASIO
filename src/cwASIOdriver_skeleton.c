@@ -15,7 +15,7 @@
 
 // Initialize the following table with the values for your driver.
 // Note that the names are limited to a maximum length of 32 characters including the terminating nullbyte.
-struct cwASIOinstance const instanceTable[] = {
+struct cwASIOinstance const cwAsioDriverInstances[] = {
     { .name = "Instance #1", .guid = {0x00000000,0x0000,0x0000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00} },
     // ... more instances can follow here, each with their own name and GUID
     { .name = NULL }        // this terminates the list and must always be there.
@@ -34,7 +34,7 @@ static long CWASIO_METHOD queryInterface(struct cwASIODriver *drv, cwASIOGUID co
     if (guid) {     // This is only non-null on Windows
         long err = E_NOINTERFACE;
         // find guid in our instance table
-        for (struct cwASIOinstance const *entry = instanceTable; entry->name; ++entry) {
+        for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
             if (cwASIOcompareGUID(guid, &entry->guid)) {
                 struct MyAsioDriver *self = drv;
                 self->instance = entry;
@@ -187,7 +187,7 @@ static cwASIOError CWASIO_METHOD future(struct cwASIODriver *drv, long sel, void
     switch (sel) {
     // ... (insert code for your other cases here)
     case kcwASIOsetInstanceName:
-        for (struct cwASIOinstance const *entry = instanceTable; entry->name; ++entry) {
+        for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
             if (0 == strcmp((char const *)par, entry->name)) {
                 self->instance = entry;
                 if (0 == cwASIOgetParameter(entry->name, NULL, NULL, 0))
@@ -241,7 +241,7 @@ struct cwASIODriver *makeAsioDriver() {
         return NULL;     // lack of sufficient memory
     obj->base.lpVtbl = &myAsioDriverVtbl;
     atomic_init(&obj->references, 1);
-    obj->instance = instanceTable;      // first entry
+    obj->instance = cwAsioDriverInstances;      // first entry
     // .... (you may do some more member initialization here)
     return &obj->base;
 }
