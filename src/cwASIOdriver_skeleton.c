@@ -189,10 +189,10 @@ static cwASIOError CWASIO_METHOD future(struct cwASIODriver *drv, long sel, void
     case kcwASIOsetInstanceName:
         for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
             if (0 == strcmp((char const *)par, entry->name)) {
+                if (0 != cwASIOgetParameter(entry->name, NULL, NULL, 0))
+                    break;      // not registered
                 self->instance = entry;
-                if (0 == cwASIOgetParameter(entry->name, NULL, NULL, 0))
-                    return ASE_SUCCESS;
-                break;
+                return ASE_SUCCESS;
             }
         }
         return ASE_NotPresent;
