@@ -2,7 +2,7 @@
  *  @brief      ASIO compatibility header for cwASIO
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2023-2024
+ *  @date       2023-2025
  *  @copyright  See file LICENSE in toplevel directory
  * @addtogroup cwASIO
  *  @{
@@ -40,7 +40,7 @@ typedef struct cwASIOInternalBufferInfo ASIOInternalBufferInfo;
 * behind the scenes.
 * @param id The id string that was obtained through enumeration.
 * @param name The name string that was obtained through enumeration
-* @return an error code, which is zero on success.
+* @return an error code, which is zero on success (ASE_OK).
 */
 ASIOError ASIOLoad(char const *id, char const *name);
 
@@ -48,6 +48,8 @@ ASIOError ASIOLoad(char const *id, char const *name);
 * @return an error code, which is zero on success.
 */
 ASIOError ASIOUnload(void);
+
+// The following functions are direct equivalents to the functions from the ASIO SDK with the same name.
 
 ASIOError ASIOInit(ASIODriverInfo *info);
 ASIOError ASIOExit(void);

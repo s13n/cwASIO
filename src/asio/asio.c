@@ -2,7 +2,7 @@
  *  @brief      ASIO compatibility functions for cwASIO
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2023-2024
+ *  @date       2023-2025
  *  @copyright  See file LICENSE in toplevel directory
  * @addtogroup cwASIO
  *  @{
