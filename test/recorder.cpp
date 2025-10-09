@@ -92,8 +92,8 @@ static std::string getDriverId(std::string_view drivername) {
     int err = cwASIOenumerate(cb, &result);
     if(err != 0)
         throw std::system_error(err, cwASIO::err_category(), "enumerating drivers");
-    if(result == drivername)
-        result.clear();
+    if(result == drivername) // this is the error case
+        result.clear();      // clear result to signal error (driver not found)
     return result;
 }
 
