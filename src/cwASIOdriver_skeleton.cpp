@@ -33,7 +33,7 @@ public:
     MyAsioDriver()
         : cwASIODriver{ &vtbl }
         , references{1}
-        , instance{cwAsioDriverInstances}   // first entry
+        , instance{nullptr}
         // .... (you may do some more member initialization here)
     {
     }
@@ -74,7 +74,7 @@ public:
     }
 
     cwASIOBool init(void *sys) {
-        if(/* already initialized */ 0)
+        if(!instance)
             return ASIOFalse;
         // ... (do the driver initialization here)
         return ASIOTrue;

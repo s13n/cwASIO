@@ -69,7 +69,7 @@ static unsigned long CWASIO_METHOD release(struct cwASIODriver *drv) {
 
 static cwASIOBool CWASIO_METHOD init(struct cwASIODriver *drv, void *sys) {
     struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
-    if(/* already initialized */ 0)
+    if(!self || !self->instance)
         return ASIOFalse;
     // ... (do the driver initialization here)
     return ASIOTrue;
@@ -241,7 +241,7 @@ struct cwASIODriver *makeAsioDriver() {
         return NULL;     // lack of sufficient memory
     obj->base.lpVtbl = &myAsioDriverVtbl;
     atomic_init(&obj->references, 1);
-    obj->instance = cwAsioDriverInstances;      // first entry
+    obj->instance = NULL;
     // .... (you may do some more member initialization here)
     return &obj->base;
 }

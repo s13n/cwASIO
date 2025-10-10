@@ -70,8 +70,10 @@ int main(int argc, char *argv[]) {
 
     if(drv->lpVtbl->init(drv, NULL)) {
         char drivername[124];
+        long driverversion;
         drv->lpVtbl->getDriverName(drv, drivername);
-        printf("Driver initialization succeeded. Reported name: %s\n", drivername);
+        driverversion = drv->lpVtbl->getDriverVersion(drv);
+        printf("Driver initialization succeeded. Reported name: %s version: %ld\n", drivername, driverversion);
     } else {
         char errorMessage[124];
         drv->lpVtbl->getErrorMessage(drv, errorMessage);
