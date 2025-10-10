@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 
-add_executable(cwASIO_application)
+add_executable(cwASIO_probe)
 
-target_link_libraries(cwASIO_application PRIVATE cwASIO::lib)
+target_link_libraries(cwASIO_probe PRIVATE cwASIO::lib)
 
-target_sources(cwASIO_application PRIVATE
-    application.c
+target_sources(cwASIO_probe PRIVATE
+    probe.c
 )
 
 add_executable(cwASIO_recorder)

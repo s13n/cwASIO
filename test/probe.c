@@ -1,4 +1,4 @@
-/** @file       application.c
+/** @file       probe.c
  *  @brief      cwASIO test application
  *  @author     Stefan Heinzmann
  *  @version    1.0
