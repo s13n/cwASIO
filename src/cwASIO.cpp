@@ -36,7 +36,7 @@ void cwASIO::Driver::throwError() {
 }
 
 cwASIO::Driver::Driver(std::string id, std::string name)
-    : drv_{ nullptr, &cwASIOunload }
+    : Driver{}
 {
     cwASIODriver *drv;
     auto err = cwASIOload(id.c_str(), &drv);

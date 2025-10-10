@@ -58,7 +58,7 @@ namespace cwASIO {
         [[noreturn]] void throwError();
 
     public:
-        Driver() = default;
+        Driver() : drv_{ nullptr, &cwASIOunload } {}
         explicit Driver(std::string id, std::string name);
 
         // The following wrapper functions are supposed to ease debugging. They should get optimized away in a release build.
