@@ -408,4 +408,38 @@ MODULE_EXPORT void releaseDriver(struct cwASIODriver *drv) {
 
 #endif
 
+struct Findcontext {
+    char *buf;
+    size_t len;
+    cwASIOGUID guid;
+};
+
+static bool findCallback(void *context, char const *name, char const *id, char const *description) {
+    struct Findcontext *ctx = context;
+    if (!ctx || !name || !id)
+        return true;
+    cwASIOGUID guid;
+    if (!cwASIOtoGUID(id, &guid))
+        return true;
+    if(!cwASIOcompareGUID(&ctx->guid, &guid))
+        return true;
+    if (ctx->len > 0) {
+        strncpy(ctx->buf, name, ctx->len);
+        if (ctx->buf[ctx->len - 1])
+            ctx->len = strlen(ctx->buf);
+    }
+    ctx->buf = NULL;    // success flag
+    return false;       // terminate enumeration
+}
+
+MODULE_EXPORT long cwASIOfindName(cwASIOGUID const *guid, char *buf, size_t size) {
+    if (!guid || (!buf && size > 0))
+        return 0;
+    struct Findcontext ctx = { size ? buf : (char*)1, size, *guid };
+    int res = cwASIOenumerate(&findCallback, &ctx);
+    if (res != 0)
+        return -res;
+    return ctx.buf ? -1 : ctx.len;
+}
+
 /** @}*/
