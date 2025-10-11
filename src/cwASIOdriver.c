@@ -285,11 +285,10 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
  */
 MODULE_EXPORT int registerDriver(char const *name) {
     char buf[2048];
-    struct cwASIOinstance const *entry = findName(name);
-    if (!entry)
-        return ENODEV;
+    if (0 == cwASIOgetParameter(name, NULL, NULL, 0))
+        return EEXIST;
     //assemble the path
-    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", entry->name);
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
     //make the driver's registration directory
@@ -324,11 +323,10 @@ MODULE_EXPORT int registerDriver(char const *name) {
  */
 MODULE_EXPORT int unregisterDriver(char const *name) {
     char buf[2048];
-    struct cwASIOinstance const *entry = findName(name);
-    if (!entry)
+    if (0 != cwASIOgetParameter(name, NULL, NULL, 0))
         return ENODEV;
     //assemble the path
-    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", entry->name);
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
 
