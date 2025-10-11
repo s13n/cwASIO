@@ -62,10 +62,11 @@ static wchar_t *fromUTF8(char const *str) {
 };
 
 long cwASIOload(char const *key, struct cwASIODriver **drv) {
-    CLSID id = cwASIOtoGUID(key);
+    CLSID id;
     HRESULT res = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(res))
         return res;
+    cwASIOtoGUID(key, &id);
     // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
     res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, drv);
     if (FAILED(res)) {
@@ -303,13 +304,14 @@ bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b) {
     return a && b ? 0 == memcmp(a, b, sizeof(cwASIOGUID)) : a == b;
 }
 
-cwASIOGUID cwASIOtoGUID(char const *clsid) {
-    cwASIOGUID res;
+bool cwASIOtoGUID(char const *clsid, cwASIOGUID *guid) {
+    if (!clsid || !guid)
+        return false;
     int n = sscanf(clsid, "{%8" SCNx32 "-%4" SCNx16 "-%4" SCNx16 "-%2" SCNx8 "%2" SCNx8 "-%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "}"
-        , &res.Data1, &res.Data2, &res.Data3
-        , &res.Data4[0], &res.Data4[1], &res.Data4[2], &res.Data4[3]
-        , &res.Data4[4], &res.Data4[5], &res.Data4[6], &res.Data4[7]);
-    return res;
+        , &guid->Data1, &guid->Data2, &guid->Data3
+        , &guid->Data4[0], &guid->Data4[1], &guid->Data4[2], &guid->Data4[3]
+        , &guid->Data4[4], &guid->Data4[5], &guid->Data4[6], &guid->Data4[7]);
+    return n == 11;
 }
 
 /** @}*/
