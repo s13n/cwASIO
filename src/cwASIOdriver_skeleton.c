@@ -13,43 +13,24 @@
 // ... (add here any further includes you may need)
 
 
-// Initialize the following table with the values for your driver.
-// Note that the names are limited to a maximum length of 32 characters including the terminating nullbyte.
-struct cwASIOinstance const cwAsioDriverInstances[] = {
-    { .name = "Instance #1", .guid = {0x00000000,0x0000,0x0000,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00} },
-    // ... more instances can follow here, each with their own name and GUID
-    { .name = NULL }        // this terminates the list and must always be there.
-};
-
-
 /** Your driver implemented as a C struct. */
 struct MyAsioDriver {
     struct cwASIODriver base;   // must be the first struct member
     atomic_ulong references;    // threadsafe reference counter
-    struct cwASIOinstance const *instance;  // which instance was selected
+    char name[33];              // the name of this instance
     // ... (more data members here)
 };
 
 static long CWASIO_METHOD queryInterface(struct cwASIODriver *drv, cwASIOGUID const *guid, void **ptr) {
-    if (guid) {     // This is only non-null on Windows
-        long err = E_NOINTERFACE;
-        // find guid in our instance table
-        for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
-            if (cwASIOcompareGUID(guid, &entry->guid)) {
-                struct MyAsioDriver *self = drv;
-                self->instance = entry;
-                err = 0;     // success
-                break;
-            }
-        }
-        if (err) {
-            *ptr = NULL;
-            return err;     // none of our guids
-        }
-    }
+    struct MyAsioDriver *self = drv;
+    long res = cwASIOfindName(guid, self->name, 32);
+    if(res > 0)
+        self->name[32] = '\0';  // ensure null termination
+    if(res < 0)
+        return -res;            // GUID not found in registry
     *ptr = drv;
     drv->lpVtbl->addRef(drv);
-    return 0;       // success
+    return 0;                   // success
 }
 
 static unsigned long CWASIO_METHOD addRef(struct cwASIODriver *drv) {
@@ -69,7 +50,7 @@ static unsigned long CWASIO_METHOD release(struct cwASIODriver *drv) {
 
 static cwASIOBool CWASIO_METHOD init(struct cwASIODriver *drv, void *sys) {
     struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
-    if(!self || !self->instance)
+    if(!self || !self->name[0])
         return ASIOFalse;
     // ... (do the driver initialization here)
     return ASIOTrue;
@@ -77,8 +58,8 @@ static cwASIOBool CWASIO_METHOD init(struct cwASIODriver *drv, void *sys) {
 
 static void CWASIO_METHOD getDriverName(struct cwASIODriver *drv, char *buf) {
     struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
-    if (self && self->instance && buf)
-        strcpy(buf, self->instance->name);
+    if (self && self->name[0] && buf)
+        strcpy(buf, self->name);
 }
 
 static long CWASIO_METHOD getDriverVersion(struct cwASIODriver *drv) {
@@ -187,13 +168,11 @@ static cwASIOError CWASIO_METHOD future(struct cwASIODriver *drv, long sel, void
     switch (sel) {
     // ... (insert code for your other cases here)
     case kcwASIOsetInstanceName:
-        for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
-            if (0 == strcmp((char const *)par, entry->name)) {
-                if (0 != cwASIOgetParameter(entry->name, NULL, NULL, 0))
-                    break;      // not registered
-                self->instance = entry;
-                return ASE_SUCCESS;
-            }
+        if (!par || strlen((char const *)par) > 32)
+            return ASE_NotPresent;
+        if (0 == cwASIOgetParameter((char const *)par, NULL, NULL, 0)) {
+            strncpy(self->name, (char const *)par, 32);
+            return ASE_SUCCESS;
         }
         return ASE_NotPresent;
     default:
@@ -241,7 +220,7 @@ struct cwASIODriver *makeAsioDriver() {
         return NULL;     // lack of sufficient memory
     obj->base.lpVtbl = &myAsioDriverVtbl;
     atomic_init(&obj->references, 1);
-    obj->instance = NULL;
+    obj->name[0] = '\0';    // no name yet
     // .... (you may do some more member initialization here)
     return &obj->base;
 }
