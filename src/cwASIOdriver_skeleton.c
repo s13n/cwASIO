@@ -168,7 +168,9 @@ static cwASIOError CWASIO_METHOD future(struct cwASIODriver *drv, long sel, void
     switch (sel) {
     // ... (insert code for your other cases here)
     case kcwASIOsetInstanceName:
-        if (!par || strlen((char const *)par) > 32)
+        if (!par || *(char const *)par == '\0')
+            return ASE_SUCCESS;
+        if (strlen((char const *)par) > 32)
             return ASE_NotPresent;
         if (0 == cwASIOgetParameter((char const *)par, NULL, NULL, 0)) {
             strncpy(self->name, (char const *)par, 32);
