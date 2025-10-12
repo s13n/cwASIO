@@ -204,11 +204,12 @@ void cwASIOunload(struct cwASIODriver *drv) {
 static char *cwASIOreadConfig(char const *base, char const *name, char const *file) {
     size_t baseLen = strlen(base);
     size_t nameLen = strlen(name);
-    char *path = (char *)alloca(baseLen + 1 + nameLen + strlen(file) + 1);
+    char *path = (char *)alloca(baseLen + 1 + nameLen + 1 + strlen(file) + 1);
     strcpy(path, base);
     path[baseLen] = '/';
     strcpy(path + baseLen + 1, name);
-    strcpy(path + baseLen + 1 + nameLen, file);
+    path[baseLen + 1 + nameLen] = '/';
+    strcpy(path + baseLen + 1 + nameLen + 1, file);
 
     int fd = open(path, O_RDONLY);
     if (fd < 0)
@@ -285,8 +286,8 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context) {
             continue;   // ignore entries starting with a dot
         }
         else {
-            char *driver = cwASIOreadConfig(path, rent->d_name, "/driver");
-            char *description = cwASIOreadConfig(path, rent->d_name, "/description");
+            char *driver = cwASIOreadConfig(path, rent->d_name, "driver");
+            char *description = cwASIOreadConfig(path, rent->d_name, "description");
             if (!cb(context, rent->d_name, driver, description))
                 rent = NULL;
             free(driver);

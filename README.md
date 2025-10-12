@@ -580,6 +580,11 @@ used to retrieve entries from the same place where the driver is registered.
 They would have been placed there on installation, and the function provides an
 easy way for an application or driver to retrieve them.
 
+Keep in mind that the keys in the Windows registry are case insensitive, whereas
+the directory names under `/etc/cwASIO` on Linux are case sensitive. If you want
+the same settings to be found on both platforms with the same code, be mindful
+of using the correct case everywhere. Test on Linux when in doubt.
+
 For user specific settings, which can be changed by the user, there is the
 possibility to store them in files in the user's home directory, where the
 appropriate access rights are in force, or (on Windows) in a registry place
