@@ -27,8 +27,10 @@ using namespace std::literals;
 
 static_assert(std::endian::native == std::endian::little);
 
-std::vector<int32_t> fileBuffer;
+std::vector<int16_t> fileBuffer16;
+std::vector<int32_t> fileBuffer32;
 unsigned fileBufferIndex = 0;
+cwASIOSampleType sampleType = ASIOSTLastEntry;
 static std::vector<cwASIOBufferInfo> bufferInfos(2);
 static long blocksize = 0;
 static cwASIOChannelInfo channelInfos[2];
@@ -41,16 +43,31 @@ static void signalHandler(int signal) {
 }
 
 static void bufferSwitch(long doubleBufferIndex, cwASIOBool directProcess) {
-    auto leftCh  = static_cast<int32_t *>(bufferInfos[0].buffers[doubleBufferIndex]);
-    auto rightCh = static_cast<int32_t *>(bufferInfos[1].buffers[doubleBufferIndex]);
-    for(long i = 0; i < blocksize; ++i) {
-        if (fileBufferIndex < fileBuffer.size()) {
-            *leftCh++ = fileBuffer.at(fileBufferIndex++);
-            *rightCh++ = fileBuffer.at(fileBufferIndex++);
-        } else {
-            stopStatus = 1;
-            *leftCh++  = 0;
-            *rightCh++ = 0;
+    if (sampleType == ASIOSTInt32LSB) {
+        auto leftCh  = static_cast<int32_t *>(bufferInfos[0].buffers[doubleBufferIndex]);
+        auto rightCh = static_cast<int32_t *>(bufferInfos[1].buffers[doubleBufferIndex]);
+        for(long i = 0; i < blocksize; ++i) {
+            if (fileBufferIndex < fileBuffer32.size()) {
+                *leftCh++  = fileBuffer32.at(fileBufferIndex++);
+                *rightCh++ = fileBuffer32.at(fileBufferIndex++);
+            } else {
+                stopStatus = 1;
+                *leftCh++  = 0;
+                *rightCh++ = 0;
+            }
+        }
+    } else {
+        auto leftCh  = static_cast<int16_t *>(bufferInfos[0].buffers[doubleBufferIndex]);
+        auto rightCh = static_cast<int16_t *>(bufferInfos[1].buffers[doubleBufferIndex]);
+        for(long i = 0; i < blocksize; ++i) {
+            if (fileBufferIndex < fileBuffer16.size()) {
+                *leftCh++  = fileBuffer16.at(fileBufferIndex++);
+                *rightCh++ = fileBuffer16.at(fileBufferIndex++);
+            } else {
+                stopStatus = 1;
+                *leftCh++  = 0;
+                *rightCh++ = 0;
+            }
         }
     }
 }
@@ -91,6 +108,14 @@ static std::string getDriverId(std::string_view drivername) {
     return result;
 }
 
+static bool hasSupportedSampleFormat(WaveFile const &file) {
+    if(file.getBitsPerSample() == 32 && file.getBytesPerSample() == 4)
+        return true;
+    if(file.getBitsPerSample() == 16 && file.getBytesPerSample() == 2)
+        return true;
+    return false;
+}
+
 int main(int argc, char const *argv[]) {
     if(argc != 4) {
         std::cout << "Usage: player <ASIO device> <first channel index> <filename>\n";
@@ -121,22 +146,6 @@ int main(int argc, char const *argv[]) {
         if(ec)
             throw std::system_error(ec, "when reading supported buffer sizes");
 
-        bufferInfos[0].isInput = bufferInfos[1].isInput = false;
-        bufferInfos[0].channelNum = firstChanIndex;
-        bufferInfos[1].channelNum = firstChanIndex + 1;
-        if(auto err = driver.createBuffers(bufferInfos.data(), bufferInfos.size(), preferredSize, &callbacks))
-            throw std::system_error(err, cwASIO::err_category(), "when trying to create the buffers");
-        blocksize = preferredSize;
-
-        for(long ch = 0; ch < long(std::size(channelInfos)); ++ch) {
-            channelInfos[ch].channel = firstChanIndex + ch;
-            channelInfos[ch].isInput = false;
-            if(auto err = driver.getChannelInfo(channelInfos[ch]))
-                throw std::system_error(err, cwASIO::err_category(), "when reading the info for channel with index " + std::to_string(ch));
-            if(channelInfos[ch].type != ASIOSTInt32LSB)
-                throw std::runtime_error("Sample type not supported on channel with index " + std::to_string(ch) + " (" + channelInfos[ch].name + ")");
-        }
-
         uint32_t samplerate = uint32_t(driver.getSampleRate(ec));
         if(ec)
             throw std::system_error(ec, "when reading sampling rate");
@@ -146,7 +155,7 @@ int main(int argc, char const *argv[]) {
         if (!res.empty())
             throw std::runtime_error(res);
 
-        if (file.getBitsPerSample() != 32 && file.getBytesPerSample() != 4)
+        if (!::hasSupportedSampleFormat(file))
             throw std::runtime_error("wave file doesn't have correct sample format");
 
         if (file.getChannels() != 2)
@@ -155,11 +164,35 @@ int main(int argc, char const *argv[]) {
         if (file.getSamplerate() != samplerate)
             throw std::runtime_error("wave file hasn't got matching samplerate");
 
+        bufferInfos[0].isInput = bufferInfos[1].isInput = false;
+        bufferInfos[0].channelNum = firstChanIndex;
+        bufferInfos[1].channelNum = firstChanIndex + 1;
+        if(auto err = driver.createBuffers(bufferInfos.data(), bufferInfos.size(), preferredSize, &callbacks))
+            throw std::system_error(err, cwASIO::err_category(), "when trying to create the buffers");
+        blocksize = preferredSize;
+
+        cwASIOSampleType sampleType = file.getBytesPerSample() == 4 ? ASIOSTInt32LSB : ASIOSTInt16LSB;
+        for(long ch = 0; ch < long(std::size(channelInfos)); ++ch) {
+            channelInfos[ch].channel = firstChanIndex + ch;
+            channelInfos[ch].isInput = false;
+            if(auto err = driver.getChannelInfo(channelInfos[ch]))
+                throw std::system_error(err, cwASIO::err_category(), "when reading the info for channel with index " + std::to_string(ch));
+            if(channelInfos[ch].type != sampleType)
+                throw std::runtime_error("Sample type not supported on channel with index " + std::to_string(ch) + " (" + channelInfos[ch].name + ")");
+        }
+
         uint64_t totalSamples = file.getTotalSamples();
-        fileBuffer.resize(totalSamples * 2U);
-        uint64_t sampleRead = file.read(totalSamples, fileBuffer.data());
-        if (sampleRead != totalSamples)
-            throw std::runtime_error("couldn't read all samples of wave file");
+        if(sampleType == ASIOSTInt32LSB) {
+            fileBuffer32.resize(totalSamples * 2U);
+            uint64_t sampleRead = file.read(totalSamples, fileBuffer32.data());
+            if (sampleRead != totalSamples)
+                throw std::runtime_error("couldn't read all samples of wave file");
+        } else {
+            fileBuffer16.resize(totalSamples * 2U);
+            uint64_t sampleRead = file.read(totalSamples, fileBuffer16.data());
+            if (sampleRead != totalSamples)
+                throw std::runtime_error("couldn't read all samples of wave file");
+        }
         file.close();
 
         uint64_t totalSeconds = totalSamples / samplerate;
