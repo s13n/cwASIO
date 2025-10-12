@@ -39,27 +39,6 @@
 * be implemented elsewhere (see the provided skeleton files).
 */
 
-// Find the name in our table of instances.
-static struct cwASIOinstance const *findName(char const *name) {
-    if (!name)
-        return cwAsioDriverInstances;       // first entry
-    for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
-        if (0 == strcmp(name, entry->name))
-            return entry;
-    }
-    return NULL;
-}
-
-// Find the GUID in our table of instances.
-static struct cwASIOinstance const *findGUID(cwASIOGUID const *objGuid) {
-    for (struct cwASIOinstance const *entry = cwAsioDriverInstances; entry->name; ++entry) {
-        if (cwASIOcompareGUID(objGuid, &entry->guid))
-            return entry;
-    }
-    return NULL;
-}
-
-
 #ifdef _WIN32
 /* On Windows, this scaffolding includes a COM compliant class factory, and a few functions that are exported
  * from the DLL, as defined in `cwASIOdriver.def`.
@@ -162,15 +141,12 @@ static struct ClassFactoryVtbl driverFactoryVtbl = {
 static struct ClassFactory driverFactory = { &driverFactoryVtbl };
 
 MODULE_EXPORT HRESULT CWASIO_METHOD DllGetClassObject(cwASIOGUID const *objGuid, cwASIOGUID const *factoryGuid, void **factoryHandle) {
-    // Check that the caller is passing one of our GUIDs. That's the COM object our DLL implements.
-    struct cwASIOinstance const *entry = findGUID(objGuid);
-    if (entry) {
+    if (objGuid) {
         // Fill in the caller's handle with a pointer to our factory object. We'll let our queryInterface do that, because it also
         // checks the IClassFactory GUID and does other book-keeping.
         return queryInterface(&driverFactory, factoryGuid, factoryHandle);
     } else {
-        // We don't understand this GUID. It's obviously not for our DLL.
-        // Let the caller know this by clearing his handle and returning CLASS_E_CLASSNOTAVAILABLE.
+        // No GUID provided. Let the caller know this by clearing his handle and returning CLASS_E_CLASSNOTAVAILABLE.
         *factoryHandle = NULL;
         return CLASS_E_CLASSNOTAVAILABLE;
     }
@@ -205,19 +181,25 @@ enum {
  * required to enumerate the driver on Windows systems. It determines the path to the driver
  * from the running module, so the installer should put the driver DLL into its final place
  * before loading the DLL and calling this function.
+ * 
+ * Both the name and the CLSID need to be given in environment variables CWASIO_INSTALL_NAME and
+ * CWASIO_INSTALL_CLSID, respectively. They can be discarded after the call returns.
  */
 MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
-    LSTATUS err = 0;
-    struct cwASIOinstance const *entry = findName(getenv("CWASIO_INSTALL_NAME"));
-    if (!entry)
+    char const *name = getenv("CWASIO_INSTALL_NAME");
+    char const *clsid = getenv("CWASIO_INSTALL_CLSID");
+    if (!name || !clsid)
         return HRESULT_FROM_WIN32(ERROR_DEV_NOT_EXIST);
+    LSTATUS err = 0;
     //write the default value
     wchar_t buffer[buffersize];
-    int n = MultiByteToWideChar(CP_UTF8, 0, entry->name, -1, buffer, buffersize);
+    int n = MultiByteToWideChar(CP_UTF8, 0, name, -1, buffer, buffersize);
     if(n <= 0)
         return HRESULT_FROM_WIN32(GetLastError());
     wchar_t subkey[subkeysize] = L"CLSID\\";
-    stringFromGUID(&entry->guid, subkey + wcslen(subkey));    // append CLSID
+    n = MultiByteToWideChar(CP_UTF8, 0, clsid, -1, subkey + wcslen(subkey), subkeysize - wcslen(subkey));   // append CLSID
+    if(n <= 0)
+        return HRESULT_FROM_WIN32(GetLastError());
     err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n));
     if (err)
         return HRESULT_FROM_WIN32(err);
@@ -239,10 +221,12 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the "CLSID" entry data under HKLM\SOFTWARE\ASIO\<key>
-    stringFromGUID(&entry->guid, buffer);
+    n = MultiByteToWideChar(CP_UTF8, 0, clsid, -1, buffer, buffersize);
+    if(n <= 0)
+        return HRESULT_FROM_WIN32(GetLastError());
     wcscpy(subkey, L"SOFTWARE\\ASIO\\");
     n = wcslen(subkey);     // remember length so far for appending
-    n = MultiByteToWideChar(CP_UTF8, 0, entry->name, -1, subkey + n, subkeysize - n);      // append Key
+    n = MultiByteToWideChar(CP_UTF8, 0, name, -1, subkey + n, subkeysize - n);      // append Key
     if(n <= 0)
         return HRESULT_FROM_WIN32(GetLastError());
     err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", REG_SZ, buffer, sizeInChars(buffer));
@@ -251,23 +235,31 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
 
 /** Remove registration info from registry.
  * This function removes what `DllRegisterServer` has added.
+ * 
+ * The name needs to be given in the environment variable CWASIO_INSTALL_NAME. It can be discarded
+ * after the call returns. The CLSID is found in the registry.
  */
 MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
-    LSTATUS err = 0;
-    struct cwASIOinstance const *entry = findName(getenv("CWASIO_INSTALL_NAME"));
-    if (!entry)
+    char const *name = getenv("CWASIO_INSTALL_NAME");
+    if (!name)
         return HRESULT_FROM_WIN32(ERROR_DEV_NOT_EXIST);
+    LSTATUS err = 0;
     //remove the entire tree in HKLM\SOFTWARE\ASIO
     wchar_t subkey[subkeysize] = L"SOFTWARE\\ASIO\\";
-    int n = wcslen(subkey);     // remember length so far for appending
-    MultiByteToWideChar(CP_UTF8, 0, entry->name, -1, subkey + n, subkeysize - n);      // append Key
+    DWORD n = wcslen(subkey);     // remember length so far for appending
+    MultiByteToWideChar(CP_UTF8, 0, name, -1, subkey + n, subkeysize - n);      // append Key
+    wchar_t guid[buffersize] = L"CLSID\\";
+    n = buffersize - wcslen(guid);
+    err = RegGetValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", RRF_RT_REG_SZ | RRF_ZEROONFAILURE, NULL, guid + wcslen(guid), &n);
+    if (err)
+        n = 0;
     err = RegDeleteTreeW(HKEY_LOCAL_MACHINE, subkey);
     if (err)
         return HRESULT_FROM_WIN32(err);
-    //remove the entire tree in HKCR\clsid
-    wcscpy(subkey, L"CLSID\\");
-    stringFromGUID(&entry->guid, subkey + wcslen(subkey));    // append CLSID
-    err = RegDeleteTreeW(HKEY_CLASSES_ROOT, subkey);
+    if(n > 0) {
+        //remove the entire tree in HKCR\clsid
+        err = RegDeleteTreeW(HKEY_CLASSES_ROOT, guid);
+    }
     return HRESULT_FROM_WIN32(err);
 }
 
@@ -293,11 +285,10 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
  */
 MODULE_EXPORT int registerDriver(char const *name) {
     char buf[2048];
-    struct cwASIOinstance const *entry = findName(name);
-    if (!entry)
-        return ENODEV;
+    if (0 == cwASIOgetParameter(name, NULL, NULL, 0))
+        return EEXIST;
     //assemble the path
-    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", entry->name);
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
     //make the driver's registration directory
@@ -332,11 +323,10 @@ MODULE_EXPORT int registerDriver(char const *name) {
  */
 MODULE_EXPORT int unregisterDriver(char const *name) {
     char buf[2048];
-    struct cwASIOinstance const *entry = findName(name);
-    if (!entry)
+    if (0 != cwASIOgetParameter(name, NULL, NULL, 0))
         return ENODEV;
     //assemble the path
-    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", entry->name);
+    int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
 
@@ -407,5 +397,39 @@ MODULE_EXPORT void releaseDriver(struct cwASIODriver *drv) {
 }
 
 #endif
+
+struct Findcontext {
+    char *buf;
+    size_t len;
+    cwASIOGUID guid;
+};
+
+static bool findCallback(void *context, char const *name, char const *id, char const *description) {
+    struct Findcontext *ctx = context;
+    if (!ctx || !name || !id)
+        return true;
+    cwASIOGUID guid;
+    if (!cwASIOtoGUID(id, &guid))
+        return true;
+    if(!cwASIOcompareGUID(&ctx->guid, &guid))
+        return true;
+    if (ctx->len > 0) {
+        strncpy(ctx->buf, name, ctx->len);
+        if (ctx->buf[ctx->len - 1])
+            ctx->len = strlen(ctx->buf);
+    }
+    ctx->buf = NULL;    // success flag
+    return false;       // terminate enumeration
+}
+
+MODULE_EXPORT long cwASIOfindName(cwASIOGUID const *guid, char *buf, size_t size) {
+    if (!guid || (!buf && size > 0))
+        return 0;
+    struct Findcontext ctx = { size ? buf : (char*)1, size, *guid };
+    int res = cwASIOenumerate(&findCallback, &ctx);
+    if (res != 0)
+        return -res;
+    return ctx.buf ? -1 : ctx.len;
+}
 
 /** @}*/

@@ -127,8 +127,9 @@ bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b);
 /** Convert a class id in MS CLSID style to a GUID.
  * The CLSID must include the curly braces.
  * @param clsid The textual CLSID form.
- * @return the resulting GUID
+ * @param guid Pointer to the buffer to which the resulting GUID shall be written.
+ * @return true on success, false when the textual form was incorrect.
  */
-cwASIOGUID cwASIOtoGUID(char const *clsid);
+bool cwASIOtoGUID(char const *clsid, cwASIOGUID *guid);
 
 /** @}*/
