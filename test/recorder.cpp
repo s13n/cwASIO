@@ -80,23 +80,6 @@ static cwASIOCallbacks const callbacks = {
     .bufferSwitchTimeInfo = &bufferSwitchTimeInfo
 };
 
-static std::string getDriverId(std::string_view drivername) {
-    std::string result(drivername);
-    auto cb = [](void *res, char const *name, char const *id, char const *desc) -> bool {
-        auto &result = *static_cast<std::string *>(res);
-        if(result != name)
-            return true;
-        result = id;
-        return false;
-    };
-    int err = cwASIOenumerate(cb, &result);
-    if(err != 0)
-        throw std::system_error(err, cwASIO::err_category(), "enumerating drivers");
-    if(result == drivername) // this is the error case
-        result.clear();      // clear result to signal error (driver not found)
-    return result;
-}
-
 struct WAVfile {
     struct Header {     // simplest possible WAV header
         char     fileTypeBlocID[4] = {'R','I','F','F'};
@@ -156,13 +139,9 @@ int main(int argc, char const *argv[]) {
 
     try {
         std::error_code ec;
-        cwASIO::Driver driver(getDriverId(argv[1]), argv[1]);
+        cwASIO::Driver driver(argv[1]);
         auto firstChanIndex = strtol(argv[2], nullptr, 10);
         std::filesystem::path filepath(argv[3]);
-
-        // tell the cwASIO driver that we are a modern app (knowing about multi instance drivers)
-        if(driver.future(kcwASIOsetInstanceName, (void*) argv[1]))
-            std::cout << "The chosen cwASIO driver \"" << argv[1] << "\" does NOT support multiple instances!\n";
 
         if(!driver.init(nullptr))
             throw std::runtime_error("Can't init driver " + driver.getDriverName() + " version "

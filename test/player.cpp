@@ -91,23 +91,6 @@ static cwASIOCallbacks const callbacks = {
     .bufferSwitchTimeInfo = &bufferSwitchTimeInfo
 };
 
-static std::string getDriverId(std::string_view drivername) {
-    std::string result(drivername);
-    auto cb = [](void *res, char const *name, char const *id, char const *desc) -> bool {
-        auto &result = *static_cast<std::string *>(res);
-        if(result != name)
-            return true;
-        result = id;
-        return false;
-    };
-    int err = cwASIOenumerate(cb, &result);
-    if(err != 0)
-        throw std::system_error(err, cwASIO::err_category(), "enumerating drivers");
-    if(result == drivername) // this is the error case
-        result.clear();      // clear result to signal error (driver not found)
-    return result;
-}
-
 static bool hasSupportedSampleFormat(WaveFile const &file) {
     if(file.getBitsPerSample() == 32 && file.getBytesPerSample() == 4)
         return true;
@@ -124,7 +107,7 @@ int main(int argc, char const *argv[]) {
 
     try {
         std::error_code ec;
-        cwASIO::Driver driver(getDriverId(argv[1]), argv[1]);
+        cwASIO::Driver driver(argv[1]);
         auto firstChanIndex = strtol(argv[2], nullptr, 10);
         std::filesystem::path filepath(argv[3]);
 

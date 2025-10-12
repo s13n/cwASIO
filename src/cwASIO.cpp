@@ -35,11 +35,20 @@ void cwASIO::Driver::throwError() {
     throw std::system_error(ASE_NotPresent, err_category(), "no driver loaded");
 }
 
-cwASIO::Driver::Driver(std::string id, std::string name)
+cwASIO::Driver::Driver(std::string name)
     : Driver{}
 {
+#ifdef _WIN32
+    char const *idkey = "CLSID";
+#else
+    char const *idkey = "driver";
+#endif
+    char id[2048];
+    int res = cwASIOgetParameter(name.c_str(), idkey, id, std::size(id));
+    if (res < 0)
+        throw std::system_error(-res, std::system_category(), "cwASIO driver id not found: " + name);
     cwASIODriver *drv;
-    auto err = cwASIOload(id.c_str(), &drv);
+    auto err = cwASIOload(id, &drv);
     if (err || !drv || !drv->lpVtbl) {
 #ifdef _WIN32
         std::error_code ec(err, std::system_category());
