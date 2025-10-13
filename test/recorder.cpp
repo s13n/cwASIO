@@ -144,7 +144,7 @@ int main(int argc, char const *argv[]) {
         std::filesystem::path filepath(argv[3]);
 
         cwASIODriverInfo driverinfo = driver.init(nullptr);
-        if(driverinfo.errorMessage[0] == '\0')
+        if(driverinfo.errorMessage[0] != '\0')
             throw std::runtime_error(std::format("Can't init driver {} version {}: {}"
                     , driverinfo.name, driverinfo.driverVersion, driverinfo.errorMessage));
 

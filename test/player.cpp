@@ -117,7 +117,7 @@ int main(int argc, char const *argv[]) {
             std::cout << "The chosen cwASIO driver \"" << argv[1] << "\" does NOT support multiple instances!\n";
 
         cwASIODriverInfo driverinfo = driver.init(nullptr);
-        if(driverinfo.errorMessage[0] == '\0')
+        if(driverinfo.errorMessage[0] != '\0')
             throw std::runtime_error(std::format("Can't init driver {} version {}: {}"
                     , driverinfo.name, driverinfo.driverVersion, driverinfo.errorMessage));
 
