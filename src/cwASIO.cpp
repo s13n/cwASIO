@@ -31,12 +31,12 @@ std::string cwASIO::Errc_category::message(int c) const {
 }
 
 
-void cwASIO::Driver::throwError() {
+void cwASIO::Device::throwError() {
     throw std::system_error(ASE_NotPresent, err_category(), "no driver loaded");
 }
 
-cwASIO::Driver::Driver(std::string name)
-    : Driver{}
+cwASIO::Device::Device(std::string name)
+    : Device{}
 {
 #ifdef _WIN32
     char const *idkey = "CLSID";
@@ -73,7 +73,7 @@ cwASIO::Driver::Driver(std::string name)
     }
 }
 
-std::string cwASIO::Driver::getDriverName() {
+std::string cwASIO::Device::getDriverName() {
     if(!drv_)
         throwError();
     std::string name(32, '\0');
@@ -82,7 +82,7 @@ std::string cwASIO::Driver::getDriverName() {
     return name;
 }
 
-std::string cwASIO::Driver::getErrorMessage() {
+std::string cwASIO::Device::getErrorMessage() {
     if(!drv_)
         throwError();
     std::string errorMessage(124, '\0');
@@ -91,7 +91,7 @@ std::string cwASIO::Driver::getErrorMessage() {
     return errorMessage;
 }
 
-std::vector<cwASIOClockSource> cwASIO::Driver::getClockSources(std::error_code &ec) {
+std::vector<cwASIOClockSource> cwASIO::Device::getClockSources(std::error_code &ec) {
     if(!drv_)
         throwError();
     std::vector<cwASIOClockSource> clocks(1);

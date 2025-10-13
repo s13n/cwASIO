@@ -107,7 +107,7 @@ int main(int argc, char const *argv[]) {
 
     try {
         std::error_code ec;
-        cwASIO::Driver driver(argv[1]);
+        cwASIO::Device driver(argv[1]);
         auto firstChanIndex = strtol(argv[2], nullptr, 10);
         std::filesystem::path filepath(argv[3]);
 

@@ -2,7 +2,7 @@
  *  @brief      cwASIO recording application
  *  @author     Stefan Heinzmann
  *  @version    1.0
- *  @date       2023-2024
+ *  @date       2023-2025
  *  @copyright  See file LICENSE in toplevel directory
  * @addtogroup cwASIO_test
  *  @{
@@ -139,7 +139,7 @@ int main(int argc, char const *argv[]) {
 
     try {
         std::error_code ec;
-        cwASIO::Driver driver(argv[1]);
+        cwASIO::Device driver(argv[1]);
         auto firstChanIndex = strtol(argv[2], nullptr, 10);
         std::filesystem::path filepath(argv[3]);
 

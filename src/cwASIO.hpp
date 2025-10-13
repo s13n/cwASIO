@@ -50,16 +50,16 @@ namespace cwASIO {
         uint64_t samplePosition;
     };
 
-    /** Driver handle. */
-    struct Driver {
+    /** Handle for an ASIO device. */
+    struct Device {
     private:
         std::unique_ptr<cwASIODriver, void(*)(cwASIODriver*)> drv_;
 
         [[noreturn]] void throwError();
 
     public:
-        Driver() : drv_{ nullptr, &cwASIOunload } {}
-        explicit Driver(std::string name);
+        Device() : drv_{ nullptr, &cwASIOunload } {}
+        explicit Device(std::string name);
 
         // The following wrapper functions are supposed to ease debugging. They should get optimized away in a release build.
 
