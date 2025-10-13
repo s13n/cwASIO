@@ -31,10 +31,6 @@ std::string cwASIO::Errc_category::message(int c) const {
 }
 
 
-void cwASIO::Device::throwError() {
-    throw std::system_error(ASE_NotPresent, err_category(), "no driver loaded");
-}
-
 cwASIO::Device::Device(std::string name)
     : Device{}
 {
@@ -74,8 +70,7 @@ cwASIO::Device::Device(std::string name)
 }
 
 std::string cwASIO::Device::getDriverName() {
-    if(!drv_)
-        throwError();
+    assert(drv_);
     std::string name(32, '\0');
     drv_->lpVtbl->getDriverName(drv_.get(), name.data());
     name.resize(std::min(name.find('\0'), name.length()));
@@ -83,8 +78,7 @@ std::string cwASIO::Device::getDriverName() {
 }
 
 std::string cwASIO::Device::getErrorMessage() {
-    if(!drv_)
-        throwError();
+    assert(drv_);
     std::string errorMessage(124, '\0');
     drv_->lpVtbl->getErrorMessage(drv_.get(), errorMessage.data());
     errorMessage.resize(std::min(errorMessage.find('\0'), errorMessage.length()));
@@ -92,8 +86,7 @@ std::string cwASIO::Device::getErrorMessage() {
 }
 
 std::vector<cwASIOClockSource> cwASIO::Device::getClockSources(std::error_code &ec) {
-    if(!drv_)
-        throwError();
+    assert(drv_);
     std::vector<cwASIOClockSource> clocks(1);
     long numSources = long(clocks.size());
     auto err = drv_->lpVtbl->getClockSources(drv_.get(), clocks.data(), &numSources);
