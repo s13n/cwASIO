@@ -22,6 +22,14 @@ The cwASIO API is a C interface, but a C++ wrapper is included for C++ projects.
 `C++23` or newer is required for the wrapper, but for older C++ versions it is
 fairly easy to use the C interface.
 
+## Projects using cwASIO
+
+Possibly incomplete list of users of cwASIO:
+
+* [cwASIO demo driver](https://github.com/aholzinger/cwAsio4RtAudio) using
+  RtAudio as a backend.
+* [PortAudio with cwASIO support](https://github.com/aholzinger/portaudio)
+
 ## Structure of cwASIO
 
 The sources consist of a C header with type definitions, a header with the
