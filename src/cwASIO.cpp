@@ -69,6 +69,21 @@ cwASIO::Device::Device(std::string name)
     }
 }
 
+cwASIODriverInfo cwASIO::Device::init(void *sysHandle) {
+    assert(drv_);
+    cwASIODriverInfo result { .asioVersion = 2, .sysRef = sysHandle };
+    if (drv_->lpVtbl->init(drv_.get(), sysHandle)) {
+        result.driverVersion = drv_->lpVtbl->getDriverVersion(drv_.get());
+        drv_->lpVtbl->getDriverName(drv_.get(), result.name);
+        result.errorMessage[0] = '\0';
+    } else {
+        drv_->lpVtbl->getErrorMessage(drv_.get(), result.errorMessage);
+        if (result.errorMessage[0] == '\0')
+            strcpy(result.errorMessage, "unknown error");
+    }
+    return result;
+}
+
 std::string cwASIO::Device::getDriverName() {
     assert(drv_);
     std::string name(32, '\0');

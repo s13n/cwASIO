@@ -143,9 +143,12 @@ int main(int argc, char const *argv[]) {
         auto firstChanIndex = strtol(argv[2], nullptr, 10);
         std::filesystem::path filepath(argv[3]);
 
-        if(!driver.init(nullptr))
-            throw std::runtime_error("Can't init driver " + driver.getDriverName() + " version "
-                    + std::to_string(driver.getDriverVersion()) + ": " + driver.getErrorMessage());
+        cwASIODriverInfo driverinfo = driver.init(nullptr);
+        if(driverinfo.errorMessage[0] == '\0')
+            throw std::runtime_error(std::format("Can't init driver {} version {}: {}"
+                    , driverinfo.name, driverinfo.driverVersion, driverinfo.errorMessage));
+
+        assert(0 == strncmp(argv[1], driverinfo.name, std::size(driverinfo.name)));
 
         auto [numInputChannels, _] = driver.getChannels(ec);
         if(ec)

@@ -14,6 +14,7 @@ extern "C" {
 }
 #include <cassert>
 #include <chrono>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -59,12 +60,14 @@ namespace cwASIO {
         Device() : drv_{ nullptr, &cwASIOunload } {}
         explicit Device(std::string name);
 
-        // The following wrapper functions are supposed to ease debugging. They should get optimized away in a release build.
-
-        bool init(void *sysHandle) {
-            assert(drv_);
-            return drv_->lpVtbl->init(drv_.get(), sysHandle);
-        }
+        /** Initialize the driver instance for the device.
+         * @param sysHandle The system handle (see ASIO documentation)
+         * @return Collected driver info.
+         *
+         * The returned struct contains an error text buffer that contains an
+         * empty string on success, and an error text on failure.
+         */
+        cwASIODriverInfo init(void *sysHandle);
 
         std::string getDriverName();
 

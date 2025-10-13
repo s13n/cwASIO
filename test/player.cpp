@@ -14,6 +14,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -115,9 +116,12 @@ int main(int argc, char const *argv[]) {
         if(driver.future(kcwASIOsetInstanceName, (void*) argv[1]))
             std::cout << "The chosen cwASIO driver \"" << argv[1] << "\" does NOT support multiple instances!\n";
 
-        if(!driver.init(nullptr))
-            throw std::runtime_error("Can't init driver " + driver.getDriverName() + " version "
-                    + std::to_string(driver.getDriverVersion()) + ": " + driver.getErrorMessage());
+        cwASIODriverInfo driverinfo = driver.init(nullptr);
+        if(driverinfo.errorMessage[0] == '\0')
+            throw std::runtime_error(std::format("Can't init driver {} version {}: {}"
+                    , driverinfo.name, driverinfo.driverVersion, driverinfo.errorMessage));
+
+        assert(0 == strncmp(argv[1], driverinfo.name, std::size(driverinfo.name)));
 
         auto [_, numOutputChannels] = driver.getChannels(ec);
         if(ec)
