@@ -197,6 +197,8 @@ int main(int argc, char const *argv[]) {
         uint32_t last = 0;
         while(signalStatus == 0 && stopStatus == 0)
             std::this_thread::sleep_for(10ms);
+        if (signalStatus != 0)
+            printf("\nplayback aborted\n");
     } catch(std::exception &ex) {
         std::cerr << "Error: " << ex.what() << "\n";
         return 2;
