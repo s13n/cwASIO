@@ -158,7 +158,7 @@ int main(int argc, char const *argv[]) {
             throw std::system_error(err, cwASIO::err_category(), "when trying to create the buffers");
         blocksize = preferredSize;
 
-        cwASIOSampleType sampleType = file.getBytesPerSample() == 4 ? ASIOSTInt32LSB : ASIOSTInt16LSB;
+        sampleType = file.getBytesPerSample() == 4 ? ASIOSTInt32LSB : ASIOSTInt16LSB;
         for(long ch = 0; ch < long(std::size(channelInfos)); ++ch) {
             channelInfos[ch].channel = firstChanIndex + ch;
             channelInfos[ch].isInput = false;
