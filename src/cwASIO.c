@@ -68,7 +68,7 @@ long cwASIOload(char const *key, struct cwASIODriver **drv) {
         return res;
     cwASIOtoGUID(key, &id);
     // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
-    res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, drv);
+    res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, (void**)drv);
     if (FAILED(res)) {
         CoUninitialize();
         return res;
