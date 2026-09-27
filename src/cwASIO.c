@@ -310,11 +310,17 @@ bool cwASIOcompareGUID(cwASIOGUID const *a, cwASIOGUID const *b) {
 bool cwASIOtoGUID(char const *clsid, cwASIOGUID *guid) {
     if (!clsid || !guid)
         return false;
+    cwASIOGUID tmp;
+    uint32_t data1;     // Introduced to avoid a type mismatch on Windows, where data1 is unsigned long
     int n = sscanf(clsid, "{%8" SCNx32 "-%4" SCNx16 "-%4" SCNx16 "-%2" SCNx8 "%2" SCNx8 "-%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "%2" SCNx8 "}"
-        , &guid->Data1, &guid->Data2, &guid->Data3
-        , &guid->Data4[0], &guid->Data4[1], &guid->Data4[2], &guid->Data4[3]
-        , &guid->Data4[4], &guid->Data4[5], &guid->Data4[6], &guid->Data4[7]);
-    return n == 11;
+        , &data1, &tmp.Data2, &tmp.Data3
+        , &tmp.Data4[0], &tmp.Data4[1], &tmp.Data4[2], &tmp.Data4[3]
+        , &tmp.Data4[4], &tmp.Data4[5], &tmp.Data4[6], &tmp.Data4[7]);
+    if (n != 11)
+        return false;
+    tmp.Data1 = data1;
+    *guid = tmp;
+    return true;
 }
 
 /** @}*/
