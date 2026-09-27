@@ -66,9 +66,12 @@ long cwASIOload(char const *key, struct cwASIODriver **drv) {
     HRESULT res = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(res))
         return res;
-    cwASIOtoGUID(key, &id);
-    // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
-    res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, (void**)drv);
+    if (cwASIOtoGUID(key, &id)) {
+        // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
+        res = CoCreateInstance(&id, NULL, CLSCTX_INPROC_SERVER, &id, (void**)drv);
+    } else {
+        res = E_INVALIDARG;
+    }
     if (FAILED(res)) {
         CoUninitialize();
         return res;
