@@ -12,7 +12,6 @@ extern "C" {
 #include <atomic>
 #include <cstring>
 #include <exception>
-#include <string>
 // ... (add here any further includes you may need)
 
 std::atomic_uint activeInstances = 0;
@@ -30,10 +29,9 @@ public:
     }
 
     long queryInterface(cwASIOGUID const *guid, void **ptr) {
-        char buf[33] = {};          // ensure null termination
-        long res = cwASIOfindName(guid, buf, 32);
-        if(res > 0)
-            name.assign(buf);
+        long res = cwASIOfindName(guid, name, sizeof name);
+        if(res >= (long)sizeof name)
+            name[0] = '\0';         // name too long for ASIO, init() will fail
         if(res < 0)
             return -res;            // GUID not found in registry
         // It's our GUID
@@ -56,15 +54,15 @@ public:
     }
 
     cwASIOBool init(void *sys) {
-        if(name.empty())
+        if(!name[0])
             return ASIOFalse;
         // ... (do the driver initialization here)
         return ASIOTrue;
     }
 
-    void getDriverName(char *buf) {
-        if (buf && !name.empty())
-            strcpy(buf, name.c_str());
+    void getDriverName(char buf[32]) {
+        if (buf && name[0])
+            strcpy(buf, name);
     }
 
     long getDriverVersion() {
@@ -72,7 +70,7 @@ public:
         return 0;
     }
 
-    void getErrorMessage(char *buf) {
+    void getErrorMessage(char buf[124]) {
         // ... (insert your code here)
     }
 
@@ -157,10 +155,10 @@ public:
         case kcwASIOsetInstanceName:
             if (!par || *(char const *)par == '\0')
                 return ASE_SUCCESS;
-            if (strlen((char const *)par) > 32)
-                return ASE_NotPresent;
+            if (strlen((char const *)par) >= sizeof name)
+                return ASE_NotPresent;  // name too long for ASIO
             if (0 == cwASIOgetParameter((char const *)par, NULL, NULL, 0)) {
-                name.assign((char const *)par);
+                strncpy(name, (char const *)par, sizeof name);
                 return ASE_SUCCESS;
             }
             return ASE_NotPresent;
@@ -179,7 +177,7 @@ private:
     static struct cwASIODriverVtbl const vtbl;
 
     std::atomic_ulong references;   // threadsafe reference counter
-    std::string name;               // name of this instance
+    char name[32] = {};             // instance name, max 31 chars + NUL as per ASIO
     // ... (more data members here)
 };
 
@@ -188,9 +186,9 @@ struct cwASIODriverVtbl const MyAsioDriver::vtbl = {
     [](cwASIODriver *drv){ return static_cast<MyAsioDriver*>(drv)->addRef(); },
     [](cwASIODriver *drv){ return static_cast<MyAsioDriver*>(drv)->release(); },
     [](cwASIODriver *drv, void *sys){ return static_cast<MyAsioDriver*>(drv)->init(sys); },
-    [](cwASIODriver *drv, char *buf){ static_cast<MyAsioDriver*>(drv)->getDriverName(buf); },
+    [](cwASIODriver *drv, char buf[32]){ static_cast<MyAsioDriver*>(drv)->getDriverName(buf); },
     [](cwASIODriver *drv){ return static_cast<MyAsioDriver*>(drv)->getDriverVersion(); },
-    [](cwASIODriver *drv, char *buf){ return static_cast<MyAsioDriver*>(drv)->getErrorMessage(buf); },
+    [](cwASIODriver *drv, char buf[124]){ return static_cast<MyAsioDriver*>(drv)->getErrorMessage(buf); },
     [](cwASIODriver *drv){ return static_cast<MyAsioDriver*>(drv)->start(); },
     [](cwASIODriver *drv){ return static_cast<MyAsioDriver*>(drv)->stop(); },
     [](cwASIODriver *drv, long *in, long *out){ return static_cast<MyAsioDriver*>(drv)->getChannels(in, out); },
@@ -212,7 +210,9 @@ struct cwASIODriverVtbl const MyAsioDriver::vtbl = {
 
 cwASIODriver *makeAsioDriver() {
     try {
-        return new MyAsioDriver();
+        cwASIODriver *drv = new MyAsioDriver();
+        activeInstances.fetch_add(1);
+        return drv;
     } catch(std::exception &ex) {
         return nullptr;
     }

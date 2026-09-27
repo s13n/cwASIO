@@ -34,9 +34,9 @@ struct cwASIODriverVtbl {
     unsigned long (CWASIO_METHOD *addRef)(struct cwASIODriver *);
     unsigned long (CWASIO_METHOD *release)(struct cwASIODriver *);
     cwASIOBool (CWASIO_METHOD *init)(struct cwASIODriver *, void *);
-    void (CWASIO_METHOD *getDriverName)(struct cwASIODriver *, char *);
+    void (CWASIO_METHOD *getDriverName)(struct cwASIODriver *, char[32]);
     long (CWASIO_METHOD *getDriverVersion)(struct cwASIODriver *);
-    void (CWASIO_METHOD *getErrorMessage)(struct cwASIODriver *, char *);
+    void (CWASIO_METHOD *getErrorMessage)(struct cwASIODriver *, char[124]);
     cwASIOError (CWASIO_METHOD *start)(struct cwASIODriver *);
     cwASIOError (CWASIO_METHOD *stop)(struct cwASIODriver *);
     cwASIOError (CWASIO_METHOD *getChannels)(struct cwASIODriver *, long *, long *);

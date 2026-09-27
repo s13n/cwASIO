@@ -5,27 +5,28 @@
  *  @date       2023-2025
  *  @copyright  See file LICENSE in toplevel directory
  */
-#pragma once
-
 #include "cwASIOdriver.h"
 #include <stdatomic.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 // ... (add here any further includes you may need)
 
+static atomic_uint activeInstances = 0;
 
 /** Your driver implemented as a C struct. */
 struct MyAsioDriver {
     struct cwASIODriver base;   // must be the first struct member
     atomic_ulong references;    // threadsafe reference counter
-    char name[33];              // the name of this instance
+    char name[32];              // instance name, max 31 chars + NUL as per ASIO
     // ... (more data members here)
 };
 
 static long CWASIO_METHOD queryInterface(struct cwASIODriver *drv, cwASIOGUID const *guid, void **ptr) {
-    struct MyAsioDriver *self = drv;
-    long res = cwASIOfindName(guid, self->name, 32);
-    if(res > 0)
-        self->name[32] = '\0';  // ensure null termination
+    struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
+    long res = cwASIOfindName(guid, self->name, sizeof self->name);
+    if(res >= (long)sizeof self->name)
+        self->name[0] = '\0';   // name too long for ASIO, init() will fail
     if(res < 0)
         return -res;            // GUID not found in registry
     *ptr = drv;
@@ -56,7 +57,7 @@ static cwASIOBool CWASIO_METHOD init(struct cwASIODriver *drv, void *sys) {
     return ASIOTrue;
 }
 
-static void CWASIO_METHOD getDriverName(struct cwASIODriver *drv, char *buf) {
+static void CWASIO_METHOD getDriverName(struct cwASIODriver *drv, char buf[32]) {
     struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
     if (self && self->name[0] && buf)
         strcpy(buf, self->name);
@@ -68,7 +69,7 @@ static long CWASIO_METHOD getDriverVersion(struct cwASIODriver *drv) {
     return 0;
 }
 
-static void CWASIO_METHOD getErrorMessage(struct cwASIODriver *drv, char *buf) {
+static void CWASIO_METHOD getErrorMessage(struct cwASIODriver *drv, char buf[124]) {
     struct MyAsioDriver *self = (struct MyAsioDriver*)drv;
     // ... (insert your code here)
 }
@@ -170,10 +171,10 @@ static cwASIOError CWASIO_METHOD future(struct cwASIODriver *drv, long sel, void
     case kcwASIOsetInstanceName:
         if (!par || *(char const *)par == '\0')
             return ASE_SUCCESS;
-        if (strlen((char const *)par) > 32)
-            return ASE_NotPresent;
+        if (strlen((char const *)par) >= sizeof self->name)
+            return ASE_NotPresent;  // name too long for ASIO
         if (0 == cwASIOgetParameter((char const *)par, NULL, NULL, 0)) {
-            strncpy(self->name, (char const *)par, 32);
+            strncpy(self->name, (char const *)par, sizeof self->name);
             return ASE_SUCCESS;
         }
         return ASE_NotPresent;
@@ -224,5 +225,6 @@ struct cwASIODriver *makeAsioDriver() {
     atomic_init(&obj->references, 1);
     obj->name[0] = '\0';    // no name yet
     // .... (you may do some more member initialization here)
+    atomic_fetch_add(&activeInstances, 1);
     return &obj->base;
 }

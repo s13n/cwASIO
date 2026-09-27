@@ -415,8 +415,8 @@ static bool findCallback(void *context, char const *name, char const *id, char c
         return true;
     if (ctx->len > 0) {
         strncpy(ctx->buf, name, ctx->len);
-        if (ctx->buf[ctx->len - 1])
-            ctx->len = strlen(ctx->buf);
+        if (ctx->buf[ctx->len - 1] == '\0')
+            ctx->len = strlen(ctx->buf);    // name fits, else len stays == size
     }
     ctx->buf = NULL;    // success flag
     return false;       // terminate enumeration
