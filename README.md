@@ -19,7 +19,7 @@ driver interface consists of a set of functions exported by a dynamically loaded
 shared object file, with a functionality that matches that on Windows.
 
 The cwASIO API is a C interface, but a C++ wrapper is included for C++ projects.
-`C++23` or newer is required for the wrapper, but for older C++ versions it is
+`C++20` or newer is required for the wrapper, but for older C++ versions it is
 fairly easy to use the C interface.
 
 ## Projects using cwASIO
@@ -41,24 +41,38 @@ Documentation is provided within the source files in doxygen format.
 
 ## Using cwASIO
 
-For building a host application, cwASIO can be used as a library to link to, or
-as a set of source files to integrate into the host application build process.
-Using CMake makes this easy, as cwASIO contains the necessary CMakeLists.txt
-files.
-
-### Linking to cwASIO
+cwASIO is built from source as part of your application or driver build. Using
+CMake makes this easy, as cwASIO contains the necessary CMakeLists.txt files. If
+you are using other build tools, please include the cwASIO sources into your
+build.
 
 cwASIO uses the CMake library type "OBJECT", which keeps the object files that
 are built separate, instead of collecting them into a library file. When your
-project uses CMake, you should use FetchContent to incorporate cwASIO into your
-build, and then list the cwASIO targets you need among the dependent libraries.
-If you are using other build tools, please include the cwASIO sources into your
-build.
+project uses CMake, use the `FetchContent` module to incorporate cwASIO into
+your build, and then list the cwASIO targets you need among the dependent
+libraries:
 
-### Integrating the sources into the host build
+```cmake
+include(FetchContent)
+FetchContent_Declare(cwASIO GIT_REPOSITORY https://github.com/s13n/cwASIO.git GIT_TAG main)
+FetchContent_MakeAvailable(cwASIO)
 
-This uses the `FetchContent` module of CMake to fetch the cwASIO sources, and
-make them a part of the host application build.
+target_link_libraries(myapp PRIVATE cwASIO::lib)
+```
+
+The following targets are available:
+
+| Target           | Contents                                   | Use for                             |
+|------------------|--------------------------------------------|-------------------------------------|
+| `cwASIO::lib`    | `cwASIO.c`, `cwASIO.h`, `cwASIOtypes.h`    | Host applications using the native C API |
+| `cwASIO::libxx`  | `cwASIO.cpp`, `cwASIO.hpp`                 | Host applications using the C++ API (requires C++20, pulls in `cwASIO::lib`) |
+| `cwASIO::asio`   | `asio/asio.c`, `asio/asio.h`               | Host applications using the ASIO compatible API (pulls in `cwASIO::lib`) |
+| `cwASIO::driver` | `cwASIO.c`, `cwASIOdriver.c`, `cwASIOdriver.h` | Drivers, see [Writing a driver](#writing-a-driver) |
+
+A driver module must also export the right functions. The `cwASIO::driver`
+target doesn't do this for you, so add `cwASIOdriver.def` to the sources of your
+driver on Windows, or pass `cwASIOdriver.map` to the linker as a version script
+on Linux (`-Wl,--version-script=...`).
 
 ## APIs
 
@@ -92,7 +106,7 @@ This API is declared in `cwASIO.hpp`. Of course, you would omit the
 
 ### Compatible API
 
-The compatible API attempts to mimick the original ASIO C API closely, so that
+The compatible API attempts to mimic the original ASIO C API closely, so that
 applications that have been built with the original ASIO SDK can change to
 cwASIO with minimal effort. This applies to the core API, not the OS-specific
 driver enumeration interface. This same API is also available on Linux.
@@ -143,10 +157,9 @@ function, which does the following:
 
 - The GUID of the class ID is used to find the corresponding entry in the
   Windows Registry key `HKEY_CLASSES_ROOT\CLSID`.
-- The entry found must contain the following subkeys: `InprocServer32`, `ProgID`
-  and `Version`. All three contain default values, the first one additionally
-  contains a value named `ThreadingModel`. All this is mandated by Microsoft
-  COM.
+- The entry found must contain the subkey `InprocServer32`, whose default value
+  holds the path to the driver DLL, and which additionally contains a value
+  named `ThreadingModel`. This is mandated by Microsoft COM.
 - The full path to the driver DLL is contained in the default value of
   `InprocServer32`. It is used to load the DLL into memory and initialize it.
 - The DLL is called to produce a class factory, which is an object used to
@@ -208,7 +221,7 @@ hardware.
 
 ## ASIO compatibility details
 
-cwASIO is a reimplemetation of the Steinberg ASIO API that does not rely on
+cwASIO is a reimplementation of the Steinberg ASIO API that does not rely on
 Steinberg's ASIO SDK, thus avoiding infringing their copyright. Reimplementing
 an API is commonly regarded as fair use; a high-profile court case concerning
 this topic was decided in 2021 by the US Supreme Court, when Oracle sued Google
@@ -235,8 +248,8 @@ that the most serious problems don't exist on 64-bit Windows, because of its
 unified calling conventions. If you still must support 32-bit Windows, cwASIO
 may not be suitable for you. Support for 32-bit Linux should be fine, however.
 
-On Linux, the cwASIO API mimicks a COM interface to some extent, but since there
-is no system support for finding COM components, cwASIO used a different
+On Linux, the cwASIO API mimics a COM interface to some extent, but since there
+is no system support for finding COM components, cwASIO uses a different
 discovery mechanism based on entries in the `/etc/cwASIO` folder.
 
 Owing to its pedigree, ASIO relies on a struct with two 32-bit numbers for
@@ -323,7 +336,7 @@ implemented for the standard ASIO C API when you use the `ASIOLoad()` function
 of cwASIO. A driver that doesn't implement this, which includes all legacy
 drivers, would not understand this call and return an error code of
 `ASE_InvalidParameter`. `ASIOLoad()` treats this as success, as the driver has
-been successfully loaded, it just doesn't doesn't offer multiinstance support.
+been successfully loaded, it just doesn't offer multiinstance support.
 
 A driver that understands the new selector would store the name passed. The
 subsequent `init()` call would use the stored name to distinguish between
@@ -365,9 +378,10 @@ that may or may not support multiinstance:
    to do that is by using different CLSID entries in each registry entry, i.e.
    to register in COM the same driver DLL under several different CLSID values.
    The driver takes notice of the CLSID value used after instantiation, in the
-   `queryInterface()` function, as the IID. . The driver uses this to search
-   through the ASIO registry to find the key name under which this CLSID is
-   registered, and uses this name as its default name.
+   `queryInterface()` function, as the IID. The driver passes it to
+   `cwASIOfindName()`, which searches through the ASIO registry for the key name
+   under which this CLSID is registered. The driver uses this name as its
+   default name.
 3. cwASIO application uses legacy driver (on Windows only).\
    The driver will only offer one device, i.e. one registry entry, and it won't
    support the setting of an instance name through `future()`. The application
@@ -502,20 +516,20 @@ subdirectory of the "Program Files" directory, but you would typically provide
 the user with an opportunity to change that location. Wherever the driver ends
 up being placed, you need to first put it there, and then load it and call its
 `DllRegisterServer` function. You would not normally do this yourself, but you
-would use the `Regsrv32` utility to do this for you. This is a command line
+would use the `regsvr32` utility to do this for you. This is a command line
 utility that your installer would call to do the registration.
 
 Uninstalling uses the same utility, which calls the `DllUnregisterServer`
 function of the driver. After that, you would delete the driver file and the
 directory you created.
 
-There are two versions of the `Regsrv32` utility, a 64-bit version and a 32-bit
-version. The have the same name, but are located in different places in the file
+There are two versions of the `regsvr32` utility, a 64-bit version and a 32-bit
+version. They have the same name, but are located in different places in the file
 system, so don't let the file name mislead you. To register a 64-bit driver, you
-need to use the 64-bit version of `Regsrv32`. Likewise, to register a 32-bit
-version of the driver, you need to use the 32-bit version of `Regsrv32` utility.
+need to use the 64-bit version of `regsvr32`. Likewise, to register a 32-bit
+version of the driver, you need to use the 32-bit version of `regsvr32` utility.
 
-For the details, please refer to the documentation of `Regsrv32` by Microsoft.
+For the details, please refer to the documentation of `regsvr32` by Microsoft.
 
 Calling `DllRegisterServer()` doesn't allow passing any parameters to it. In our
 case, the `DllRegisterServer` function needs to be able to know name and CLSID
@@ -525,7 +539,8 @@ functions is via environment variables, "CWASIO_INSTALL_NAME" for the name and
 "CWASIO_INSTALL_CLSID" for the CLSID, which only need to be set temporarily
 during installation. The driver uses this in its `DllRegisterServer` and
 `DllUnregisterServer` functions to determine the registry entry it needs to act
-upon. If the needed environment variables are missing, it does nothing. Hence,
+upon. If the needed environment variables are missing, they fail with
+`HRESULT_FROM_WIN32(ERROR_DEV_NOT_EXIST)` and change nothing. Hence,
 the installer would set the environment variables before calling
 `DllRegisterServer` or `DllUnregisterServer`, and delete it after they return.
 
@@ -568,7 +583,7 @@ deinstallation. Those two functions take care of maintaining the entry in
 the actual driver file, and any further files and directories your driver might
 need.
 
-On Linux, there is no utility comparable with `Regsrv32` on Windows, so you need
+On Linux, there is no utility comparable with `regsvr32` on Windows, so you need
 to call the functions mentioned above by yourself.
 
 As on Windows, `registerDriver` refuses to take over a name that is registered
@@ -637,4 +652,4 @@ The driver should report back in `getDriverName()` the same name that was set
 with the `future()` call, if that was successful.
 
 To see an example how the host application is supposed to handle this, refer to
-`test/application.c`.
+`test/probe.c` (C) or `test/player.cpp` (C++).
