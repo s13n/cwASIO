@@ -31,6 +31,18 @@
 #   include <sys/stat.h>
 #endif
 
+// copy a UTF-8 string of the given length into a buffer of the given size, truncating it at a
+// character boundary if it doesn't fit, and terminate it with a NUL
+static void copyTruncated(char *buffer, unsigned size, char const *str, size_t len) {
+    if (len >= size) {
+        len = size - 1;
+        while (len > 0 && (str[len] & 0xC0) == 0x80)
+            --len;      // don't split a multibyte sequence
+    }
+    memcpy(buffer, str, len);
+    buffer[len] = '\0';
+}
+
 #ifdef _WIN32
 
 static char *toUTF8(wchar_t const *wstr) {
@@ -187,17 +199,20 @@ int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned
         return ASE_OK;
     }
     wchar_t buf[buffersize];
-    DWORD bufsize = buffersize;
+    DWORD bufsize = sizeof(buf);    // in bytes
     LSTATUS err = RegGetValueW(HKEY_LOCAL_MACHINE, subkey, value, RRF_RT_REG_SZ, NULL, buf, &bufsize);
-    if (err) {
-        free(value);
-        return ASE_NotPresent;
-    }
-    n = WideCharToMultiByte(CP_UTF8, 0, buf, bufsize, buffer, size, NULL, NULL);
     free(value);
-    if(n <= 0)
+    if (err)
         return ASE_NotPresent;
-    return n <= (int)size ? n : (int)size;
+    if (!buffer || size == 0)
+        return 0;
+    char *val = toUTF8(buf);        // RegGetValueW guarantees NUL termination
+    if (!val)
+        return ASE_NotPresent;
+    size_t len = strlen(val);
+    copyTruncated(buffer, size, val, len);
+    free(val);
+    return (int)len + 1;
 }
 
 #else
@@ -270,7 +285,7 @@ static char *cwASIOreadConfig(char const *base, char const *name, char const *fi
 int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size) {
     if (!key) {
         char path[2048];
-        int n = snprintf(path, sizeof(path), "/etc/cwASIO/%s", name);
+        snprintf(path, sizeof(path), "/etc/cwASIO/%s", name);
         struct stat st;
         if (stat(path, &st) == 0 && S_ISDIR(st.st_mode))
             return 0;
@@ -283,8 +298,9 @@ int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned
         return -errno;
     int ret = 0;
     if (buffer && size > 0) {
-        strncpy(buffer, val, size);
-        ret = strlen(buffer);
+        size_t len = strlen(val);
+        copyTruncated(buffer, size, val, len);
+        ret = (int)len + 1;
     }
     free(val);
     return ret;

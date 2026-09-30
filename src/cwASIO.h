@@ -96,12 +96,17 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context);
  * Passing a name and a key, but passing NULL/zero for the buffer and its size, can be used
  * to check if a certain value exists in the registry, without returning its content. The
  * return value is 0 if it exists, and a negative error value if it doesn't.
- * 
+ *
+ * The buffer is always NUL terminated. If the value doesn't fit, it is truncated at a UTF-8
+ * character boundary, and the return value is larger than size. The caller can then retry with
+ * a buffer of the size returned.
+ *
  * @param name The name of the instance.
  * @param key The key of the parameter. May be NULL to check presence of instance key/folder.
  * @param buffer The address of the buffer to copy the parameter into. May be NULL if size is zero.
  * @param size The size of the buffer. Must be 0 if NULL is passed to buffer.
- * @return The number of characters copied into the buffer, including the terminating NUL, or a negative error value.
+ * @return The size of the entire value in bytes, including the terminating NUL, even if it was
+ *         truncated, or a negative error value.
  */
 int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size);
 
