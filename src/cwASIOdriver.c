@@ -21,6 +21,7 @@
 #   define MODULE_EXPORT    // this is taken care of by the .def file
 #else
 #   define __USE_GNU
+#   include <dirent.h>
 #   include <dlfcn.h>
 #   include <errno.h>
 #   include <fcntl.h>
@@ -176,89 +177,187 @@ enum {
     buffersize = 2048   // the maximum string size MS recommends in the registry for performance reasons
 };
 
+static bool equalIgnoringCase(wchar_t const *a, wchar_t const *b) {
+    return CSTR_EQUAL == CompareStringOrdinal(a, -1, b, -1, TRUE);
+}
+
+// append a UTF-8 string to a wide string buffer of the given size (in characters)
+static bool appendUTF8(wchar_t *buffer, size_t size, char const *str) {
+    size_t n = wcslen(buffer);
+    return MultiByteToWideChar(CP_UTF8, 0, str, -1, buffer + n, (int)(size - n)) > 0;
+}
+
+// read a string value from the registry into a buffer of buffersize characters
+static LSTATUS readString(HKEY hkey, wchar_t const *subkey, wchar_t const *value, wchar_t *buffer) {
+    DWORD size = sizeof(wchar_t) * buffersize;
+    return RegGetValueW(hkey, subkey, value, RRF_RT_REG_SZ, NULL, buffer, &size);
+}
+
+// get the full path of this DLL into a buffer of buffersize characters
+static LSTATUS getOwnModulePath(wchar_t *buffer) {
+    HMODULE ownModule;
+    if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (wchar_t*)&getOwnModulePath, &ownModule))
+        return GetLastError();
+    DWORD res = GetModuleFileNameW(ownModule, buffer, buffersize);
+    if(res == 0)
+        return GetLastError();
+    if(res == buffersize)
+        return ERROR_INSUFFICIENT_BUFFER;
+    return ERROR_SUCCESS;
+}
+
+// get the path of the DLL registered for the given CLSID into a buffer of buffersize characters
+static LSTATUS getRegisteredModulePath(wchar_t const *clsid, wchar_t *buffer) {
+    wchar_t subkey[subkeysize];
+    if(swprintf(subkey, subkeysize, L"CLSID\\%ls\\InprocServer32", clsid) < 0)
+        return ERROR_INVALID_PARAMETER;
+    return readString(HKEY_CLASSES_ROOT, subkey, NULL, buffer);
+}
+
+struct UsageContext {
+    cwASIOGUID guid;
+    bool used;
+};
+
+static bool usageCallback(void *context, char const *name, char const *id, char const *description) {
+    struct UsageContext *ctx = context;
+    cwASIOGUID guid;
+    if (!cwASIOtoGUID(id, &guid) || !cwASIOcompareGUID(&ctx->guid, &guid))
+        return true;
+    ctx->used = true;
+    return false;       // terminate enumeration
+}
+
+// check if any entry in HKLM\SOFTWARE\ASIO refers to the given CLSID; errs on the side of true
+static bool isCLSIDused(wchar_t const *clsid) {
+    char buffer[subkeysize];
+    struct UsageContext ctx = { .used = true };
+    if (WideCharToMultiByte(CP_UTF8, 0, clsid, -1, buffer, subkeysize, NULL, NULL) <= 0 || !cwASIOtoGUID(buffer, &ctx.guid))
+        return true;
+    ctx.used = false;
+    if (0 != cwASIOenumerate(&usageCallback, &ctx))
+        return true;
+    return ctx.used;
+}
+
 /** Put registration info into registry.
  * This function is called by installers, or by `regsvr32.exe`, to create the registry entries
  * required to enumerate the driver on Windows systems. It determines the path to the driver
  * from the running module, so the installer should put the driver DLL into its final place
  * before loading the DLL and calling this function.
- * 
+ *
  * Both the name and the CLSID need to be given in environment variables CWASIO_INSTALL_NAME and
  * CWASIO_INSTALL_CLSID, respectively. They can be discarded after the call returns.
+ *
+ * Registering again with the same name and CLSID from the same DLL succeeds and rewrites the entries.
+ * The function fails with HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS) without changing anything if the
+ * name is already registered with a different CLSID, or if the CLSID is already registered for a
+ * DLL at a different path.
  */
 MODULE_EXPORT HRESULT CWASIO_METHOD DllRegisterServer(void) {
     char const *name = getenv("CWASIO_INSTALL_NAME");
     char const *clsid = getenv("CWASIO_INSTALL_CLSID");
     if (!name || !clsid)
         return HRESULT_FROM_WIN32(ERROR_DEV_NOT_EXIST);
-    LSTATUS err = 0;
-    //write the default value
-    wchar_t buffer[buffersize];
-    int n = MultiByteToWideChar(CP_UTF8, 0, name, -1, buffer, buffersize);
-    if(n <= 0)
+    wchar_t asioKey[subkeysize] = L"SOFTWARE\\ASIO\\";
+    wchar_t clsidKey[subkeysize] = L"CLSID\\";
+    wchar_t *wname = asioKey + wcslen(asioKey);
+    wchar_t *wclsid = clsidKey + wcslen(clsidKey);
+    if (!appendUTF8(asioKey, subkeysize, name) || !appendUTF8(clsidKey, subkeysize, clsid))
         return HRESULT_FROM_WIN32(GetLastError());
-    wchar_t subkey[subkeysize] = L"CLSID\\";
-    n = MultiByteToWideChar(CP_UTF8, 0, clsid, -1, subkey + wcslen(subkey), subkeysize - wcslen(subkey));   // append CLSID
-    if(n <= 0)
-        return HRESULT_FROM_WIN32(GetLastError());
-    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, (DWORD)(sizeof(wchar_t) * n));
+    wchar_t inprocKey[subkeysize];
+    if (swprintf(inprocKey, subkeysize, L"%ls\\InprocServer32", clsidKey) < 0)
+        return HRESULT_FROM_WIN32(ERROR_INVALID_PARAMETER);
+    wchar_t modulePath[buffersize];
+    LSTATUS err = getOwnModulePath(modulePath);
     if (err)
         return HRESULT_FROM_WIN32(err);
-    n = wcslen(subkey);     // remember length so far for further appending
-    //write the HKCR\CLSID\{---}\InprocServer32 default key, i.e. the path to the DLL
-    HMODULE ownModule;
-    if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (wchar_t*)&DllRegisterServer, &ownModule))
-        return HRESULT_FROM_WIN32(GetLastError());
-    DWORD res = GetModuleFileNameW(ownModule, buffer, buffersize);
-    if(res == 0 || res == buffersize)
-        return HRESULT_FROM_WIN32(GetLastError());
-    wcscpy(subkey + n, L"\\InprocServer32");
-    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, NULL, REG_SZ, buffer, sizeInChars(buffer));
+    //refuse to take over a name registered for a different CLSID
+    wchar_t buffer[buffersize];
+    err = readString(HKEY_LOCAL_MACHINE, asioKey, L"CLSID", buffer);
+    if (err == ERROR_SUCCESS && !equalIgnoringCase(buffer, wclsid))
+        return HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+    if (err != ERROR_SUCCESS && err != ERROR_FILE_NOT_FOUND)
+        return HRESULT_FROM_WIN32(err);
+    //refuse to take over a CLSID registered for a different DLL
+    err = readString(HKEY_CLASSES_ROOT, inprocKey, NULL, buffer);
+    if (err == ERROR_SUCCESS && !equalIgnoringCase(buffer, modulePath))
+        return HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+    if (err != ERROR_SUCCESS && err != ERROR_FILE_NOT_FOUND)
+        return HRESULT_FROM_WIN32(err);
+    //write the HKCR\CLSID\{---} default value
+    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, clsidKey, NULL, REG_SZ, wname, sizeInChars(wname));
+    if (err)
+        return HRESULT_FROM_WIN32(err);
+    //write the HKCR\CLSID\{---}\InprocServer32 default value, i.e. the path to the DLL
+    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, inprocKey, NULL, REG_SZ, modulePath, sizeInChars(modulePath));
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the HKCR\CLSID\{---}\InprocServer32\\ThreadingModel value
-    wcscpy(buffer, L"Both");
-    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, subkey, L"ThreadingModel", REG_SZ, buffer, sizeInChars(buffer));
+    wchar_t const *threadingModel = L"Both";
+    err = RegSetKeyValueW(HKEY_CLASSES_ROOT, inprocKey, L"ThreadingModel", REG_SZ, threadingModel, sizeInChars(threadingModel));
     if (err)
         return HRESULT_FROM_WIN32(err);
     //write the "CLSID" entry data under HKLM\SOFTWARE\ASIO\<key>
-    n = MultiByteToWideChar(CP_UTF8, 0, clsid, -1, buffer, buffersize);
-    if(n <= 0)
-        return HRESULT_FROM_WIN32(GetLastError());
-    wcscpy(subkey, L"SOFTWARE\\ASIO\\");
-    n = wcslen(subkey);     // remember length so far for appending
-    n = MultiByteToWideChar(CP_UTF8, 0, name, -1, subkey + n, subkeysize - n);      // append Key
-    if(n <= 0)
-        return HRESULT_FROM_WIN32(GetLastError());
-    err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", REG_SZ, buffer, sizeInChars(buffer));
+    err = RegSetKeyValueW(HKEY_LOCAL_MACHINE, asioKey, L"CLSID", REG_SZ, wclsid, sizeInChars(wclsid));
     return HRESULT_FROM_WIN32(err);
 }
 
 /** Remove registration info from registry.
- * This function removes what `DllRegisterServer` has added.
- * 
+ * This function removes the entire registry entry under HKLM\SOFTWARE\ASIO, including values that
+ * were added by others, e.g. the installer. It also removes the entry under HKCR\CLSID, unless it is
+ * still used by another entry under HKLM\SOFTWARE\ASIO.
+ *
  * The name needs to be given in the environment variable CWASIO_INSTALL_NAME. It can be discarded
  * after the call returns. The CLSID is found in the registry.
+ *
+ * The entry is only removed if it belongs to this driver, otherwise the function fails with
+ * HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) without changing anything. The entry belongs to this driver
+ * if the CLSID registered under the name is registered for this DLL. If the environment variable
+ * CWASIO_INSTALL_CLSID is set, too, it must match the registered CLSID, and the DLL isn't checked.
+ * This allows removing the entry from a DLL that has been moved since registration.
  */
 MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
     char const *name = getenv("CWASIO_INSTALL_NAME");
+    char const *clsid = getenv("CWASIO_INSTALL_CLSID");
     if (!name)
         return HRESULT_FROM_WIN32(ERROR_DEV_NOT_EXIST);
-    LSTATUS err = 0;
-    //remove the entire tree in HKLM\SOFTWARE\ASIO
-    wchar_t subkey[subkeysize] = L"SOFTWARE\\ASIO\\";
-    DWORD n = wcslen(subkey);     // remember length so far for appending
-    MultiByteToWideChar(CP_UTF8, 0, name, -1, subkey + n, subkeysize - n);      // append Key
-    wchar_t guid[buffersize] = L"CLSID\\";
-    n = buffersize - wcslen(guid);
-    err = RegGetValueW(HKEY_LOCAL_MACHINE, subkey, L"CLSID", RRF_RT_REG_SZ | RRF_ZEROONFAILURE, NULL, guid + wcslen(guid), &n);
-    if (err)
-        n = 0;
-    err = RegDeleteTreeW(HKEY_LOCAL_MACHINE, subkey);
+    wchar_t asioKey[subkeysize] = L"SOFTWARE\\ASIO\\";
+    if (!appendUTF8(asioKey, subkeysize, name))
+        return HRESULT_FROM_WIN32(GetLastError());
+    wchar_t registeredCLSID[buffersize];
+    LSTATUS err = readString(HKEY_LOCAL_MACHINE, asioKey, L"CLSID", registeredCLSID);
     if (err)
         return HRESULT_FROM_WIN32(err);
-    if(n > 0) {
-        //remove the entire tree in HKCR\clsid
-        err = RegDeleteTreeW(HKEY_CLASSES_ROOT, guid);
+    wchar_t clsidKey[subkeysize];
+    if (swprintf(clsidKey, subkeysize, L"CLSID\\%ls", registeredCLSID) < 0)
+        return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
+    //check that the entry belongs to this driver
+    if (clsid) {
+        wchar_t wclsid[subkeysize] = L"";
+        if (!appendUTF8(wclsid, subkeysize, clsid))
+            return HRESULT_FROM_WIN32(GetLastError());
+        if (!equalIgnoringCase(wclsid, registeredCLSID))
+            return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
+    } else {
+        wchar_t modulePath[buffersize];
+        wchar_t registeredPath[buffersize];
+        err = getOwnModulePath(modulePath);
+        if (err)
+            return HRESULT_FROM_WIN32(err);
+        err = getRegisteredModulePath(registeredCLSID, registeredPath);
+        if (err || !equalIgnoringCase(modulePath, registeredPath))
+            return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
+    }
+    //remove the entire tree in HKLM\SOFTWARE\ASIO
+    err = RegDeleteTreeW(HKEY_LOCAL_MACHINE, asioKey);
+    if (err)
+        return HRESULT_FROM_WIN32(err);
+    //remove the entire tree in HKCR\CLSID, unless another name still uses the CLSID
+    if (!isCLSIDused(registeredCLSID)) {
+        err = RegDeleteTreeW(HKEY_CLASSES_ROOT, clsidKey);
+        if (err == ERROR_FILE_NOT_FOUND)
+            err = ERROR_SUCCESS;
     }
     return HRESULT_FROM_WIN32(err);
 }
@@ -281,23 +380,28 @@ MODULE_EXPORT HRESULT CWASIO_METHOD DllUnregisterServer(void) {
  * NULL, in which case the first name will be chosen from the list of those
  * supported.
  *
+ * Registering again under the same name from the same shared object succeeds.
+ * If the name is already registered for a different shared object, the function
+ * fails with EEXIST without changing anything.
+ *
  * The function returns 0 on success, otherwise it returns an errno value.
  */
 MODULE_EXPORT int registerDriver(char const *name) {
     char buf[2048];
-    if (0 == cwASIOgetParameter(name, NULL, NULL, 0))
-        return EEXIST;
+    Dl_info info;
+    if(!dladdr(&registerDriver, &info))
+        return EINVAL;
+    //refuse to take over a name registered for a different driver
+    if (cwASIOgetParameter(name, "driver", buf, sizeof(buf)) >= 0)
+        return 0 == strcmp(buf, info.dli_fname) ? 0 : EEXIST;
     //assemble the path
     int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
-    //make the driver's registration directory
-    if(0 != mkdir(buf, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH))
+    //make the driver's registration directory, unless it exists already
+    if(0 != mkdir(buf, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) && errno != EEXIST)
         return errno;
     //write the "driver" file under /etc/cwASIO/<key>
-    Dl_info info;
-    if(!dladdr(&registerDriver, &info))
-        return EINVAL;
     strcpy(buf+n, "/driver");
     int fd = creat(buf, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
     if(fd < 0)
@@ -310,13 +414,47 @@ MODULE_EXPORT int registerDriver(char const *name) {
     return 0;
 }
 
+/* Remove the files in the directory whose path is in buf[0..n), except the file
+ * `driver`. Subdirectories aren't removed, but make the function fail with
+ * ENOTEMPTY. If dryRun is true, nothing is removed, but it is checked that
+ * removal is possible. The contents of buf beyond n are modified.
+ */
+static int removeFiles(char *buf, size_t size, int n, bool dryRun) {
+    DIR *dir = opendir(buf);
+    if (!dir)
+        return errno;
+    int res = 0;
+    struct dirent *ent;
+    while (res == 0 && (errno = 0, ent = readdir(dir))) {
+        if (0 == strcmp(ent->d_name, ".") || 0 == strcmp(ent->d_name, "..") || 0 == strcmp(ent->d_name, "driver"))
+            continue;
+        if ((size_t)snprintf(buf+n, size-n, "/%s", ent->d_name) >= size-n) {
+            res = ENAMETOOLONG;
+            break;
+        }
+        struct stat st;
+        if (0 != lstat(buf, &st))
+            res = errno == ENOENT ? 0 : errno;  // readdir() may still return entries we removed
+        else if (S_ISDIR(st.st_mode))
+            res = ENOTEMPTY;
+        else if (!dryRun && 0 != unlink(buf))
+            res = errno;
+    }
+    if (res == 0 && !ent)
+        res = errno;    // readdir() failure, or 0 at the end of the directory
+    closedir(dir);
+    buf[n] = '\0';
+    return res;
+}
+
 /** Remove registration info. This function removes what `registerDriver` has
- * added.
+ * added, i.e. the entire directory `/etc/cwASIO/<name>`, including any files
+ * that were added in a different way, e.g. `description`.
  *
- * Note that only the file `driver` is removed. If the directory isn't empty
- * thereafter, it won't be removed, in order to preserve any data that was added
- * in a different way. If the caller wants to ensure that the directory gets
- * deleted, too, it needs to remove all other files before calling this
+ * The entry is only removed if its `driver` file names this shared object,
+ * otherwise the function fails with EACCES without changing anything. If the
+ * directory contains subdirectories, the function fails with ENOTEMPTY without
+ * changing anything. The caller needs to remove them before calling this
  * function.
  *
  * The function returns 0 on success, otherwise it returns an errno value.
@@ -325,11 +463,23 @@ MODULE_EXPORT int unregisterDriver(char const *name) {
     char buf[2048];
     if (0 != cwASIOgetParameter(name, NULL, NULL, 0))
         return ENODEV;
+    //check that the entry belongs to this driver
+    Dl_info info;
+    if(!dladdr(&registerDriver, &info))
+        return EINVAL;
+    if (cwASIOgetParameter(name, "driver", buf, sizeof(buf)) < 0 || 0 != strcmp(buf, info.dli_fname))
+        return EACCES;
     //assemble the path
     int n = snprintf(buf, sizeof(buf), "/etc/cwASIO/%s", name);
     if(n < 0 || n >= sizeof(buf)-20)    // leave a reserve for later appending
         return EINVAL;
-
+    //check for subdirectories before removing anything
+    int err = removeFiles(buf, sizeof(buf), n, true);
+    if (err == 0)
+        err = removeFiles(buf, sizeof(buf), n, false);
+    if (err)
+        return err;
+    //remove the "driver" file last, so the entry stays intact if anything fails before
     strcpy(buf+n, "/driver");
     if( 0 != unlink(buf))
         return errno;

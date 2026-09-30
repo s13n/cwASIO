@@ -537,6 +537,25 @@ would typically be chosen by the driver manufacturer, the description could be
 provided by the installer, be obtained from the device itself, or from user
 input.
 
+`DllRegisterServer` refuses to take over a registration that belongs to a
+different driver: If the name is already registered with a different CLSID, or
+the CLSID is already registered for a DLL at a different path, it fails with
+`HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)` and changes nothing. Registering the
+same name and CLSID again from the same DLL succeeds, e.g. for a repair
+installation. A DLL that has moved must be unregistered from its old location
+before registering it at the new location.
+
+Likewise, `DllUnregisterServer` only removes a registration that belongs to this
+driver, otherwise it fails with `HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)` and
+changes nothing. The registration belongs to this driver if the CLSID registered
+under the name is registered for this DLL. If "CWASIO_INSTALL_CLSID" is set
+during unregistration, it must match the registered CLSID, and the DLL isn't
+checked, which allows unregistering a DLL that has moved or has been deleted.
+Unregistration removes the entire entry under `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO`,
+including values that the installer added. The entry under
+`HKEY_CLASSES_ROOT\CLSID` is removed as well, unless another entry under
+`HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` still uses the same CLSID.
+
 ### Installing on Linux
 
 The installation location of the driver on Linux will probably depend on the
@@ -552,13 +571,17 @@ need.
 On Linux, there is no utility comparable with `Regsrv32` on Windows, so you need
 to call the functions mentioned above by yourself.
 
-Note that `unregisterDriver` can't delete the subdirectory that `registerDriver`
-created, unless it is empty after deleting the files `driver` and `description`.
-Your installer or driver may create additional files in there, but when
-uninstalling, they should be deleted before calling `unregisterDriver`, except
-if you deliberately want to keep the directory. Both functions allow passing the
-registration name, so there is no need for setting an environment variable as
-under Windows in the case of multiinstance drivers.
+As on Windows, `registerDriver` refuses to take over a name that is registered
+for a different shared object, and fails with `EEXIST`, but registering the same
+name again from the same shared object succeeds. `unregisterDriver` only removes
+a registration whose `driver` file names this shared object, and otherwise fails
+with `EACCES`. It removes the entire subdirectory that `registerDriver` created,
+including all files that your installer or driver added, e.g. `description`. If
+the subdirectory contains further subdirectories, `unregisterDriver` fails with
+`ENOTEMPTY` and changes nothing, so those need to be deleted before calling it.
+Both functions allow passing the registration name, so there is no need for
+setting an environment variable as under Windows in the case of multiinstance
+drivers.
 
 Of course, you must have the right to write to `/etc/cwASIO`, otherwise the
 calls to `registerDriver` or `unregisterDriver` will fail with an error
