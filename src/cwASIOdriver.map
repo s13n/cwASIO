@@ -4,6 +4,7 @@
         unregisterDriver;
         instantiateDriver;
         releaseDriver;
+        cwASIOfindName;
     local:
         *;
 };

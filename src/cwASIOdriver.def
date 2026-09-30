@@ -2,6 +2,7 @@
 ; The DLL implements a COM class factory, so we just need to export the functions required by COM.
 ; This includes functions for registering and deregistering the COM class in the Windows registry.
 ; We can't use declspec(dllexport) for those because the naming convention doesn't match (leading "@")
+; cwASIOfindName is exported as well, so that it can be called from outside the driver.
 
 LIBRARY
 
@@ -11,3 +12,4 @@ EXPORTS
     DllGetClassObject   PRIVATE
     DllRegisterServer   PRIVATE
     DllUnregisterServer PRIVATE
+    cwASIOfindName

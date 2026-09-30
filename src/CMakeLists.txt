@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
 add_library(cwASIO_lib OBJECT)
 add_library(cwASIO::lib ALIAS cwASIO_lib)
@@ -26,6 +26,11 @@ set_property(TARGET cwASIO_driver PROPERTY
 )
 target_sources(cwASIO_driver PUBLIC cwASIOtypes.h cwASIO.h cwASIOdriver.h)
 target_include_directories(cwASIO_driver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+# The C driver skeleton uses C11 atomics, which MSVC only supports with an extra flag
+target_compile_features(cwASIO_driver PUBLIC c_std_11)
+target_compile_options(cwASIO_driver PUBLIC
+    $<$<AND:$<C_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:C>>:/experimental:c11atomics>
+)
 
 # Define C++ wrapper as an object library
 add_library(cwASIO_libxx OBJECT cwASIO.hpp cwASIO.cpp)
