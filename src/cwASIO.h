@@ -106,6 +106,11 @@ int cwASIOenumerate(cwASIOcallback *cb, void *context);
 int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned size);
 
 /** Load the driver.
+ * On Windows, this initializes COM on the calling thread as a single-threaded apartment (STA).
+ * If COM is already initialized on this thread as a multithreaded apartment (MTA), this is
+ * tolerated, but only drivers registered with ThreadingModel "Both" or "Free" can be loaded then.
+ * Most ASIO drivers register as "Apartment", and their loading will fail in the MTA.
+ * cwASIOunload() must be called on the same thread as cwASIOload().
  * @param id On Windows: the CLSID, on Linux: the file path of the driver to load.
  * @param drv Receives a pointer to the driver instance.
  * @return an error code when unsuccessful, zero on success.
@@ -113,6 +118,7 @@ int cwASIOgetParameter(char const *name, char const *key, char *buffer, unsigned
 long cwASIOload(char const *id, struct cwASIODriver **drv);
 
 /** Unload the driver.
+ * Must be called on the same thread as the corresponding cwASIOload().
  * @param drv Pointer to the driver instance that was initialized by cwASIOload()
  */
 void cwASIOunload(struct cwASIODriver *drv);

@@ -61,10 +61,23 @@ static wchar_t *fromUTF8(char const *str) {
     return NULL;
 };
 
+#ifdef _MSC_VER
+#   define CWASIO_THREAD_LOCAL __declspec(thread)
+#else
+#   define CWASIO_THREAD_LOCAL _Thread_local
+#endif
+
+// Number of successful CoInitializeEx() calls made by cwASIOload() on this thread that
+// still need to be balanced by CoUninitialize() in cwASIOunload().
+static CWASIO_THREAD_LOCAL unsigned comInitCount = 0;
+
 long cwASIOload(char const *key, struct cwASIODriver **drv) {
     CLSID id;
     HRESULT res = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-    if (FAILED(res))
+    // RPC_E_CHANGED_MODE means COM is already initialized as MTA on this thread, which is usable
+    // as well, but must not be balanced by CoUninitialize()
+    bool comInitialized = SUCCEEDED(res);
+    if (FAILED(res) && res != RPC_E_CHANGED_MODE)
         return res;
     if (cwASIOtoGUID(key, &id)) {
         // ASIO (ab)uses the CLSID for the IID, so we use the same ID twice here
@@ -73,16 +86,22 @@ long cwASIOload(char const *key, struct cwASIODriver **drv) {
         res = E_INVALIDARG;
     }
     if (FAILED(res)) {
-        CoUninitialize();
+        if (comInitialized)
+            CoUninitialize();
         return res;
     }
+    if (comInitialized)
+        ++comInitCount;
     return 0;
 }
 
 void cwASIOunload(struct cwASIODriver *drv) {
     if(drv)
         drv->lpVtbl->release(drv);
-    CoUninitialize();
+    if (comInitCount > 0) {
+        --comInitCount;
+        CoUninitialize();
+    }
 }
 
 static LSTATUS getValue(HKEY hkey, wchar_t *subKey, wchar_t *name, wchar_t **val, DWORD *len) {
