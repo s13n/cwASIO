@@ -9,9 +9,12 @@ portable audio applications that work on both operating systems.
 
 [^1]: ASIO is a trademark of Steinberg Media Technologies GmbH.
 
-By using cwASIO, audio applications can be built that don't depend on the ASIO
-SDK from Steinberg, and therefore aren't bound to its license. Those
-applications can be made portable between Linux and Windows.
+By using cwASIO, audio applications (and drivers) can be built that don't depend
+on the ASIO SDK from Steinberg, and therefore aren't bound by its license. Those
+applications can be made portable between Linux and Windows. Note, however, that
+although you don't need to comply with Steinberg's license, you still have to
+obey trademark laws. Since ASIO is a registered trademark, you can't just use it
+indiscriminately. When in doubt, ask your lawyer.
 
 cwASIO works with existing ASIO device drivers on Windows. It supports
 enumeration of ASIO devices registered in the Windows registry. On Linux, the
