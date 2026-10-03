@@ -401,6 +401,46 @@ that may or may not support multiinstance:
    Linux. In fact, for a Linux application, the call to `future()` to set the
    instance name is mandatory before calling `init()`.
 
+### Driver names
+
+There are three different texts that identify an ASIO driver:
+
+1. The registration name, i.e. the name of the key under
+   `HKEY_LOCAL_MACHINE\SOFTWARE\ASIO` on Windows, or the name of the
+   subdirectory under `/etc/cwASIO` on Linux. This is the name that
+   `cwASIOenumerate()` passes to its callback as the first string.
+2. The description, i.e. the `Description` value in the registry on Windows, or
+   the contents of the `description` file on Linux. This text is meant to be
+   presented to the user. Many legacy hosts show the description rather than the
+   registration name in their driver selection lists.
+3. The name reported by the driver itself through `getDriverName()`, which is
+   limited to 31 characters plus the terminating NUL.
+
+ASIO doesn't define any relationship between those three texts. Most drivers use
+the same text for the registration name and the self-reported name, but that is
+merely a convention, and there are legacy drivers that report a name in
+`getDriverName()` that differs from both the registration name and the
+description. Since cwASIO stays compatible with legacy drivers, a host
+application must not assume any particular relationship between those names
+either. To identify a driver, it should use the registration name it found
+during enumeration, and treat the name reported by `getDriverName()` as purely
+informational.
+
+Drivers built with cwASIO, however, are required to report the registration
+name as their driver name, in order to avoid confusion, particularly since a
+multiinstance driver may be registered under several names. Precisely, a cwASIO
+driver must report through `getDriverName()` the name that was successfully set
+with the `future()` call using the selector `kcwASIOsetInstanceName` before
+`init()`, or, in the absence of such a call, its default name, which is the
+registration name found through `cwASIOfindName()` on Windows. Consequently, the
+registration name of a cwASIO driver must not exceed 31 bytes when encoded in
+UTF-8, otherwise it can't be reported unchanged. The driver skeletons
+`src/cwASIOdriver_skeleton.c` and `src/cwASIOdriver_skeleton.cpp` refuse such
+names in `future()` and `init()`.
+
+The description is unaffected by this rule. It can still be any text that is
+suitable for presentation to the user.
+
 ### Multiclient drivers
 
 This is the ability of a driver to accommodate several concurrent host
@@ -651,8 +691,9 @@ found the driver during enumeration. The driver should check in the `future()`
 call if the registry contains an entry for this name, but it should leave the
 reading of the settings to the `init()` function.
 
-The driver should report back in `getDriverName()` the same name that was set
-with the `future()` call, if that was successful.
+The driver must report back in `getDriverName()` the same name that was set
+with the `future()` call, if that was successful, see the section on driver
+names above.
 
 To see an example how the host application is supposed to handle this, refer to
 `test/probe.c` (C) or `test/player.cpp` (C++).
