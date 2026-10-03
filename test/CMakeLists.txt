@@ -26,3 +26,12 @@ target_sources(cwASIO_player PRIVATE
     player.cpp
     wavefile/wavefile.cpp
 )
+
+add_executable(cwASIO_generator)
+
+target_link_libraries(cwASIO_generator PRIVATE cwASIO::libxx cwASIO::lib)
+target_compile_features(cwASIO_generator PRIVATE cxx_std_20)
+
+target_sources(cwASIO_generator PRIVATE
+    generator.cpp
+)
