@@ -23,8 +23,11 @@ ASIOError ASIOLoad(char const *id, char const *name) {
         theAsioDriver = NULL;
         return err;
     }
-    err = theAsioDriver->lpVtbl->future(theAsioDriver, kcwASIOsetInstanceName, (void *)name);
-    return err == ASE_SUCCESS || err == ASE_InvalidParameter ? ASE_OK : err;
+    // Any answer other than ASE_SUCCESS means that the driver uses its default instance, as a legacy driver does,
+    // which answers ASE_InvalidParameter; some drivers answer with something that makes no sense, e.g.
+    // ASE_NotPresent although the name is registered, and work fine otherwise.
+    (void)theAsioDriver->lpVtbl->future(theAsioDriver, kcwASIOsetInstanceName, (void *)name);
+    return ASE_OK;
 }
 
 ASIOError ASIOUnload(void) {

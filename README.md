@@ -359,6 +359,15 @@ string (or NULL) to the `future()` call should have no effect and return
 `ASE_SUCCESS` if the driver offers multiinstance support. This may be used to
 check for multiinstance support without setting a name.
 
+A host takes any answer other than `ASE_SUCCESS` to mean that the driver
+doesn't offer multiinstance support, and uses its default instance, like a
+legacy driver, which answers `ASE_InvalidParameter`. Some drivers give an
+answer that makes no sense, e.g. `ASE_NotPresent` although the name is
+registered, and work fine otherwise. `cwASIO::Device` and `ASIOLoad()` both go
+on with such a driver. A host that wants to know the answer can set the same
+name again, before `init()`, with `cwASIO::Device::future()` or `ASIOFuture()`,
+which is harmless.
+
 For supporting legacy applications under Windows, there is the possibility of
 registering the same driver under several different CLSID values, which get
 passed to the driver on instantiation. This can be used to select a different

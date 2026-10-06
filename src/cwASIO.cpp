@@ -56,17 +56,11 @@ cwASIO::Device::Device(std::string name)
 
     drv_.reset(drv);
 
-    err = future(kcwASIOsetInstanceName, const_cast<char*>(name.c_str()));
-    switch (err) {
-    case ASE_SUCCESS:           // driver offers multiinstance support
-        return;
-    case ASE_InvalidParameter:  // driver offers no multiinstance support, that's OK
-        return;
-    case ASE_NotPresent:        // driver didn't find its registry for the given instance, not OK!
-        throw std::system_error(err, err_category(), "driver " + name + " not registered");
-    default:
-        throw std::system_error(err, err_category(), "setting instance name on driver: " + name);
-    }
+    // ASE_SUCCESS means that the driver offers multiinstance support, and took the name. Any other answer is taken
+    // to mean that it doesn't, like ASE_InvalidParameter from a legacy driver: some drivers answer with something that
+    // makes no sense, e.g. ASE_NotPresent although the name is registered, and work fine otherwise. The driver then
+    // uses its default instance.
+    (void)future(kcwASIOsetInstanceName, const_cast<char*>(name.c_str()));
 }
 
 cwASIODriverInfo cwASIO::Device::init(void *sysHandle) {
