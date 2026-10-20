@@ -121,7 +121,7 @@ int main(int argc, char const *argv[]) {
             throw std::runtime_error(std::format("Can't init driver {} version {}: {}"
                     , driverinfo.name, driverinfo.driverVersion, driverinfo.errorMessage));
 
-        assert(0 == strncmp(argv[1], driverinfo.name, std::size(driverinfo.name)));
+        std::cout << "Initialised cwASIO driver \"" << argv[1] << "\" (\"" << driverinfo.name << "\").\n";
 
         auto [_, numOutputChannels] = driver.getChannels(ec);
         if(ec)
@@ -182,19 +182,17 @@ int main(int argc, char const *argv[]) {
         }
         file.close();
 
-        uint64_t totalSeconds = totalSamples / samplerate;
-        std::cout << "Now playing sound file for " << totalSeconds << " seconds\n";
-
         std::signal(SIGINT, signalHandler);
+
+        uint64_t totalSeconds = totalSamples / samplerate;
+        std::cout << "Now starting playing sound file for " << totalSeconds << " seconds\n";
 
         if(auto err = driver.start())
             throw std::system_error(err, cwASIO::err_category(), "when trying to start streaming");
 
-        std::cout << "Playback device " << driver.getDriverName()
+        std::cout << "Playing sound on playback device " << driver.getDriverName()
             << " (" << channelInfos[0].name << "/" << channelInfos[1].name << ") at " << samplerate << " Hz\n";
 
-        uint32_t limit = uint32_t(uint32_t(0) - 2 * blocksize * 8);     // file size limit 4GB
-        uint32_t last = 0;
         while(signalStatus == 0 && stopStatus == 0)
             std::this_thread::sleep_for(10ms);
         if (signalStatus != 0)
